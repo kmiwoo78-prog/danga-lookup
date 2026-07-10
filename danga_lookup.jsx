@@ -27,6 +27,9 @@ function tokenize(query) {
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+function normalizeName(s) {
+  return String(s || "").trim().replace(/\s+/g, " ");
+}
 
 function Highlighted({ text, tokens }) {
   if (!tokens.length) return <span>{text}</span>;
@@ -329,9 +332,10 @@ export default function DangaLookup() {
     const today = todayStr();
     const nameMap = new Map();
     for (const r of results) {
-      if (!nameMap.has(r.name)) nameMap.set(r.name, new Map());
-      const reasonMap = nameMap.get(r.name);
-      const key = r.reason || "기본";
+      const nkey = normalizeName(r.name);
+      if (!nameMap.has(nkey)) nameMap.set(nkey, new Map());
+      const reasonMap = nameMap.get(nkey);
+      const key = (r.reason || "기본").trim() || "기본";
       if (!reasonMap.has(key)) reasonMap.set(key, []);
       reasonMap.get(key).push(r);
     }
