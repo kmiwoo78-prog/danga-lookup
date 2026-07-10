@@ -200,6 +200,26 @@ function formatPrice(n) {
   const num = Number(n) || 0;
   return "₩" + num.toLocaleString("ko-KR");
 }
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function excelCellToDateStr(raw) {
+  if (raw === null || raw === undefined || raw === "") return "";
+  if (typeof raw === "number") {
+    try {
+      const d = XLSX.SSF.parse_date_code(raw);
+      if (d) return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
+    } catch (e) {}
+  }
+  const s = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}$/.test(s)) return s + "-01";
+  if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)) {
+    const [y, m, d] = s.split("/");
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  return "";
+}
 function mergeByDate(records) {
   const byDate = new Map();
   records.forEach(r => {
@@ -235,14 +255,24 @@ function DangaLookup() {
   const [newName, setNewName] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newReason, setNewReason] = useState("기본");
+  const [newEffectiveDate, setNewEffectiveDate] = useState(() => todayStr());
   const [addingCustomReason, setAddingCustomReason] = useState(false);
   const [customReasonInput, setCustomReasonInput] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({
     name: "",
     price: "",
-    reason: "기본"
+    reason: "기본",
+    effectiveDate: ""
   });
+  const [expandedHistoryKeys, setExpandedHistoryKeys] = useState(() => new Set());
+  function toggleHistory(key) {
+    setExpandedHistoryKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);else next.add(key);
+      return next;
+    });
+  }
   const [uploadMsg, setUploadMsg] = useState("");
   const fileInputRef = useRef(null);
   const [selection, setSelection] = useState([]);
@@ -360,6 +390,7 @@ function DangaLookup() {
   const totalCount = useMemo(() => selection.reduce((sum, i) => sum + i.qty, 0), [selection]);
   const totalPrice = useMemo(() => selection.reduce((sum, i) => sum + i.price * i.qty, 0), [selection]);
   const allReasons = useMemo(() => Array.from(new Set([...DEFAULT_REASONS, ...customReasons])), [customReasons]);
+  const sortedProducts = useMemo(() => [...products].sort((a, b) => a.name.localeCompare(b.name) || (a.reason || "").localeCompare(b.reason || "") || (b.effectiveDate || "").localeCompare(a.effectiveDate || "")), [products]);
   const tokens = useMemo(() => tokenize(query), [query]);
   const results = useMemo(() => {
     if (!tokens.length) return [];
@@ -377,27 +408,43 @@ function DangaLookup() {
     return list.sort((a, b) => b.matchCount - a.matchCount || a.name.localeCompare(b.name) || (a.reason || "").localeCompare(b.reason || ""));
   }, [products, tokens]);
   const groupedResults = useMemo(() => {
-    const map = new Map();
+    const today = todayStr();
+    const nameMap = new Map();
     for (const r of results) {
-      if (!map.has(r.name)) map.set(r.name, {
-        name: r.name,
-        variants: []
-      });
-      map.get(r.name).variants.push(r);
+      if (!nameMap.has(r.name)) nameMap.set(r.name, new Map());
+      const reasonMap = nameMap.get(r.name);
+      const key = r.reason || "기본";
+      if (!reasonMap.has(key)) reasonMap.set(key, []);
+      reasonMap.get(key).push(r);
     }
-    return Array.from(map.values());
+    return Array.from(nameMap.entries()).map(([name, reasonMap]) => ({
+      name,
+      reasonGroups: Array.from(reasonMap.entries()).map(([reason, entries]) => {
+        const sorted = [...entries].sort((a, b) => (b.effectiveDate || "").localeCompare(a.effectiveDate || ""));
+        const currentIdx = sorted.findIndex(e => (e.effectiveDate || "") <= today);
+        const current = currentIdx > -1 ? sorted[currentIdx] : sorted[sorted.length - 1];
+        const history = sorted.filter(e => e.id !== (current && current.id));
+        return {
+          reason,
+          current,
+          history
+        };
+      })
+    }));
   }, [results]);
   function handleAdd() {
     const name = newName.trim();
     const price = Number(String(newPrice).replace(/[^0-9.-]/g, ""));
     const reason = (addingCustomReason ? customReasonInput.trim() : newReason) || "기본";
+    const effectiveDate = newEffectiveDate || todayStr();
     if (!name || !price) return;
     if (addingCustomReason && reason) addCustomReasonToList(reason);
     persistProducts([...products, {
       id: Date.now() + "-" + Math.random().toString(36).slice(2),
       name,
       price,
-      reason
+      reason,
+      effectiveDate
     }]);
     setNewName("");
     setNewPrice("");
@@ -409,7 +456,8 @@ function DangaLookup() {
     setEditDraft({
       name: p.name,
       price: String(p.price),
-      reason: p.reason || "기본"
+      reason: p.reason || "기본",
+      effectiveDate: p.effectiveDate || todayStr()
     });
   }
   function cancelEdit() {
@@ -417,20 +465,23 @@ function DangaLookup() {
     setEditDraft({
       name: "",
       price: "",
-      reason: "기본"
+      reason: "기본",
+      effectiveDate: ""
     });
   }
   function saveEdit(id) {
     const name = editDraft.name.trim();
     const price = Number(String(editDraft.price).replace(/[^0-9.-]/g, ""));
     const reason = editDraft.reason.trim() || "기본";
+    const effectiveDate = editDraft.effectiveDate || todayStr();
     if (!name || !price) return;
     addCustomReasonToList(reason);
     persistProducts(products.map(p => p.id === id ? {
       ...p,
       name,
       price,
-      reason
+      reason,
+      effectiveDate
     } : p));
     cancelEdit();
   }
@@ -460,17 +511,20 @@ function DangaLookup() {
         let headerIdx = -1,
           nameCol = 0,
           priceCol = 1,
-          reasonCol = -1;
+          reasonCol = -1,
+          dateCol = -1;
         for (let i = 0; i < Math.min(5, rows.length); i++) {
           const row = (rows[i] || []).map(c => String(c));
           const nIdx = row.findIndex(c => /상품|품명|제품/.test(c));
           const pIdx = row.findIndex(c => /단가|가격/.test(c));
           const rIdx = row.findIndex(c => /구분|사유|타입|유형/.test(c));
-          if (nIdx > -1 || pIdx > -1 || rIdx > -1) {
+          const dIdx = row.findIndex(c => /적용일|적용월|기준일|날짜/.test(c));
+          if (nIdx > -1 || pIdx > -1 || rIdx > -1 || dIdx > -1) {
             headerIdx = i;
             if (nIdx > -1) nameCol = nIdx;
             if (pIdx > -1) priceCol = pIdx;
             if (rIdx > -1) reasonCol = rIdx;
+            if (dIdx > -1) dateCol = dIdx;
             break;
           }
         }
@@ -484,17 +538,19 @@ function DangaLookup() {
           const price = Number(String(row[priceCol] ?? "").replace(/[^0-9.-]/g, ""));
           const reasonRaw = reasonCol > -1 ? String(row[reasonCol] ?? "").trim() : "";
           const reason = reasonRaw || "기본";
+          const effectiveDate = dateCol > -1 ? excelCellToDateStr(row[dateCol]) || todayStr() : todayStr();
           if (!name || !price) continue;
           if (!DEFAULT_REASONS.includes(reason) && !newCustomReasons.includes(reason)) newCustomReasons.push(reason);
           imported.push({
             id: Date.now() + "-" + i + "-" + Math.random().toString(36).slice(2),
             name,
             price,
-            reason
+            reason,
+            effectiveDate
           });
         }
         if (imported.length === 0) {
-          setUploadMsg("불러올 수 있는 데이터가 없어요. '상품명/품명', '단가/가격' 열이 있는지 확인해주세요. '구분/사유' 열이 있으면 자동 인식해요.");
+          setUploadMsg("불러올 수 있는 데이터가 없어요. '상품명/품명', '단가/가격' 열이 있는지 확인해주세요. '구분/사유', '적용일' 열이 있으면 자동 인식해요.");
           return;
         }
         if (newCustomReasons.length) persistReasons(Array.from(new Set([...customReasons, ...newCustomReasons])));
@@ -552,21 +608,44 @@ function DangaLookup() {
     text: g.name,
     tokens: tokens
   })), /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap gap-2"
-  }, g.variants.map(v => {
-    const qty = selectionMap.get(v.id) || 0;
-    return /*#__PURE__*/React.createElement("button", {
-      key: v.id,
-      onClick: () => addToSelection(v),
+    className: "flex flex-col gap-2"
+  }, g.reasonGroups.map(rg => {
+    const cur = rg.current;
+    const qty = cur ? selectionMap.get(cur.id) || 0 : 0;
+    const histKey = g.name + "|" + rg.reason;
+    const isHistOpen = expandedHistoryKeys.has(histKey);
+    return /*#__PURE__*/React.createElement("div", {
+      key: rg.reason,
+      className: "flex flex-col gap-1"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center flex-wrap gap-2"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => cur && addToSelection(cur),
       className: `flex items-center gap-2 border pl-2 pr-3 py-1 transition-colors ${qty > 0 ? "border-amber-500 bg-amber-50" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`,
       title: "클릭하면 정산 목록에 추가돼요"
     }, /*#__PURE__*/React.createElement("span", {
-      className: `text-xs font-semibold px-2 py-0.5 whitespace-nowrap rounded-sm ${reasonStyle(v.reason)}`
-    }, v.reason || "기본"), /*#__PURE__*/React.createElement("span", {
+      className: `text-xs font-semibold px-2 py-0.5 whitespace-nowrap rounded-sm ${reasonStyle(rg.reason)}`
+    }, rg.reason || "기본"), /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-emerald-700 font-semibold text-sm whitespace-nowrap"
-    }, formatPrice(v.price)), qty > 0 && /*#__PURE__*/React.createElement("span", {
+    }, cur ? formatPrice(cur.price) : "-"), cur && cur.effectiveDate && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs text-slate-400 whitespace-nowrap"
+    }, cur.effectiveDate, "~"), qty > 0 && /*#__PURE__*/React.createElement("span", {
       className: "bg-amber-500 text-slate-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center"
-    }, qty));
+    }, qty)), rg.history.length > 0 && /*#__PURE__*/React.createElement("button", {
+      onClick: () => toggleHistory(histKey),
+      className: "text-xs text-slate-400 underline hover:text-slate-600"
+    }, "이전 단가 ", rg.history.length, "건 ", isHistOpen ? "숨기기" : "보기")), isHistOpen && /*#__PURE__*/React.createElement("div", {
+      className: "ml-1 pl-3 border-l-2 border-slate-200 flex flex-col gap-1"
+    }, rg.history.map(h => /*#__PURE__*/React.createElement("button", {
+      key: h.id,
+      onClick: () => addToSelection(h),
+      className: "flex items-center gap-2 text-xs text-slate-500 hover:text-slate-700 w-fit",
+      title: "클릭하면 정산 목록에 추가돼요"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "whitespace-nowrap"
+    }, h.effectiveDate || "날짜 없음"), /*#__PURE__*/React.createElement("span", {
+      className: "font-mono"
+    }, formatPrice(h.price))))));
   }))))))), /*#__PURE__*/React.createElement("div", {
     className: "mt-8 border-t border-slate-200 pt-4"
   }, /*#__PURE__*/React.createElement("button", {
@@ -584,7 +663,7 @@ function DangaLookup() {
     className: "text-sm font-semibold mb-2"
   }, "엑셀/CSV로 한번에 등록"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mb-3"
-  }, "'상품명/품명', '단가/가격' 열은 자동 인식해요. '구분/사유' 열이 있으면 재출고·프로모션 등도 같이 불러와요. 없으면 전부 '기본'으로 등록돼요."), /*#__PURE__*/React.createElement("label", {
+  }, "'상품명/품명', '단가/가격' 열은 자동 인식해요. '구분/사유', '적용일' 열이 있으면 재출고·프로모션·월별 단가변경도 같이 불러와요. 없으면 전부 '기본'·오늘 날짜로 등록돼요."), /*#__PURE__*/React.createElement("label", {
     className: "inline-flex items-center gap-2 cursor-pointer bg-slate-900 text-white text-sm px-4 py-2 hover:bg-slate-800"
   }, /*#__PURE__*/React.createElement(UploadIcon, {
     size: 16
@@ -599,8 +678,10 @@ function DangaLookup() {
   }, uploadMsg)), /*#__PURE__*/React.createElement("div", {
     className: "bg-white border border-slate-200 p-4"
   }, /*#__PURE__*/React.createElement("p", {
-    className: "text-sm font-semibold mb-3"
-  }, "상품 직접 추가"), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm font-semibold mb-1"
+  }, "상품 직접 추가"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-500 mb-3"
+  }, "같은 상품·같은 구분이라도 적용일을 다르게 넣으면 단가 변경 이력으로 따로 쌓여요. 검색에는 오늘 기준 최신 단가만 크게 보여요."), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col sm:flex-row gap-2"
   }, /*#__PURE__*/React.createElement("input", {
     type: "text",
@@ -615,6 +696,12 @@ function DangaLookup() {
     onChange: e => setNewPrice(e.target.value),
     placeholder: "단가 (숫자)",
     className: "sm:w-28 border border-slate-300 px-3 py-2 text-base font-mono focus:outline-none focus:border-slate-900"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: newEffectiveDate,
+    onChange: e => setNewEffectiveDate(e.target.value),
+    title: "적용일 (이 날짜부터 이 단가가 적용돼요)",
+    className: "sm:w-36 border border-slate-300 px-2 py-2 text-base focus:outline-none focus:border-slate-900"
   }), !addingCustomReason ? /*#__PURE__*/React.createElement("select", {
     value: newReason,
     onChange: e => {
@@ -676,7 +763,7 @@ function DangaLookup() {
     className: "text-sm text-slate-400 px-4 py-6"
   }, "등록된 상품이 없어요.") : /*#__PURE__*/React.createElement("div", {
     className: "divide-y divide-slate-100 max-h-96 overflow-y-auto"
-  }, products.map(p => /*#__PURE__*/React.createElement("div", {
+  }, sortedProducts.map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
     className: "flex flex-wrap items-center gap-2 px-4 py-2"
   }, editingId === p.id ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
@@ -696,6 +783,14 @@ function DangaLookup() {
       price: e.target.value
     })),
     className: "w-24 border border-slate-300 px-2 py-1.5 text-base font-mono focus:outline-none focus:border-slate-900"
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: editDraft.effectiveDate,
+    onChange: e => setEditDraft(d => ({
+      ...d,
+      effectiveDate: e.target.value
+    })),
+    className: "w-36 border border-slate-300 px-2 py-1.5 text-base focus:outline-none focus:border-slate-900"
   }), /*#__PURE__*/React.createElement("input", {
     list: "reason-options",
     value: editDraft.reason,
@@ -720,7 +815,9 @@ function DangaLookup() {
     className: "flex-1 basis-40 text-sm truncate"
   }, p.name), /*#__PURE__*/React.createElement("span", {
     className: `text-xs font-semibold px-2 py-0.5 whitespace-nowrap rounded-sm ${reasonStyle(p.reason)}`
-  }, p.reason || "기본"), /*#__PURE__*/React.createElement("div", {
+  }, p.reason || "기본"), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-slate-400 font-mono whitespace-nowrap"
+  }, p.effectiveDate || "-"), /*#__PURE__*/React.createElement("div", {
     className: "font-mono text-emerald-700 text-sm whitespace-nowrap"
   }, formatPrice(p.price)), /*#__PURE__*/React.createElement("button", {
     onClick: () => startEdit(p),
