@@ -230,6 +230,16 @@ export default function DangaLookup() {
     () => [...products].sort((a, b) => a.name.localeCompare(b.name) || (a.reason || "").localeCompare(b.reason || "") || (b.effectiveDate || "").localeCompare(a.effectiveDate || "")),
     [products]
   );
+  const [manageQuery, setManageQuery] = useState("");
+  const manageTokens = useMemo(() => tokenize(manageQuery), [manageQuery]);
+  const filteredManageProducts = useMemo(() => {
+    if (!manageTokens.length) return sortedProducts;
+    const lowerTokens = manageTokens.map((t) => t.toLowerCase());
+    return sortedProducts.filter((p) => {
+      const lname = p.name.toLowerCase();
+      return lowerTokens.every((t) => lname.includes(t));
+    });
+  }, [sortedProducts, manageTokens]);
 
   useEffect(() => {
     (async () => {
@@ -734,6 +744,21 @@ export default function DangaLookup() {
                       </span>
                     ))}
                 </div>
+                {products.length > 0 && (
+                  <div className="px-4 py-2 border-b border-slate-200 relative">
+                    <Search size={14} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={manageQuery}
+                      onChange={(e) => setManageQuery(e.target.value)}
+                      placeholder="목록에서 상품 찾기 (수정할 상품 검색)"
+                      className="w-full border border-slate-300 pl-7 pr-2 py-1.5 text-base focus:outline-none focus:border-slate-900"
+                    />
+                    {manageQuery.trim() && (
+                      <p className="text-xs text-slate-400 mt-1">{filteredManageProducts.length}건 일치</p>
+                    )}
+                  </div>
+                )}
                 {saveError && (
                   <p className="text-xs text-red-600 px-4 py-2">
                     저장 중 문제가 생겼어요. 새로고침 후 다시 시도해주세요.
@@ -741,9 +766,11 @@ export default function DangaLookup() {
                 )}
                 {products.length === 0 ? (
                   <p className="text-sm text-slate-400 px-4 py-6">등록된 상품이 없어요.</p>
+                ) : filteredManageProducts.length === 0 ? (
+                  <p className="text-sm text-slate-400 px-4 py-6">검색어와 일치하는 상품이 없어요.</p>
                 ) : (
                   <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
-                    {sortedProducts.map((p) => (
+                    {filteredManageProducts.map((p) => (
                       <div key={p.id} className="flex flex-wrap items-center gap-2 px-4 py-2">
                         {editingId === p.id ? (
                           <>
