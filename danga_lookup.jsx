@@ -4,7 +4,6 @@ import { Search, Upload, Trash2, Pencil, Plus, X, ChevronDown, ChevronUp, Check,
 
 const PRODUCTS_KEY = "products";
 const REASONS_KEY = "custom_reasons";
-const SETTLEMENTS_KEY = "settlement_records";
 const FEE_KEY = "fee_rate";
 const DELIVERIES_KEY = "deliveries";
 const STATUS_LIST = ["완료", "연기", "취소"];
@@ -91,9 +90,6 @@ function netOf(price, rate) {
   const r = Number(rate);
   const safe = Number.isFinite(r) ? Math.min(Math.max(r, 0), 100) : DEFAULT_FEE_RATE;
   return Math.round(((Number(price) || 0) * (100 - safe)) / 100);
-}
-function itemNet(item) {
-  return typeof item.net === "number" ? item.net : netOf(item.price, DEFAULT_FEE_RATE);
 }
 function toNum(v) {
   const n = Number(String(v ?? "").replace(/[^0-9]/g, ""));
@@ -195,32 +191,6 @@ function buildSettleSheet(rows, title) {
   ws["!cols"] = [6, 6, 11, 14, 8, 42, 36, 20, 10, 10, 10, 10, 12].map((w) => ({ wch: w }));
   return ws;
 }
-function buildSavedSheet(records) {
-  const aoa = [
-    ["단가 조회 저장 기록"],
-    ["날짜", "상품명", "구분", "수량", "원단가", "수수료 제외 단가", "원단가 합계", "수수료 제외 합계"],
-  ];
-  let qty = 0;
-  let sumA = 0;
-  let sumN = 0;
-  [...records]
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .forEach((r) =>
-      r.items.forEach((it) => {
-        const net = itemNet(it);
-        aoa.push([r.date, it.name, it.reason || "기본", it.qty, it.price, net, it.price * it.qty, net * it.qty]);
-        qty += it.qty;
-        sumA += it.price * it.qty;
-        sumN += net * it.qty;
-      })
-    );
-  aoa.push(["합계", "", "", qty, "", "", sumA, sumN]);
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  setNumFmt(ws, ["E", "F", "G", "H"], 3, aoa.length);
-  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
-  ws["!cols"] = [11, 42, 10, 6, 10, 16, 14, 18].map((w) => ({ wch: w }));
-  return ws;
-}
 function Field({ label, className = "", children }) {
   return (
     <label className={`block ${className}`}>
@@ -228,9 +198,6 @@ function Field({ label, className = "", children }) {
       {children}
     </label>
   );
-}
-function recordNet(r) {
-  return r.items.reduce((sum, i) => sum + itemNet(i) * i.qty, 0);
 }
 function excelCellToDateStr(raw) {
   if (raw === null || raw === undefined || raw === "") return "";
@@ -280,20 +247,12 @@ export default function DangaLookup() {
   const [uploadMsg, setUploadMsg] = useState("");
   const fileInputRef = useRef(null);
 
-  const [selection, setSelection] = useState([]);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [showDateInput, setShowDateInput] = useState(false);
-  const [saveDate, setSaveDate] = useState(() => todayStr());
   const [feeRate, setFeeRate] = useState(DEFAULT_FEE_RATE);
 
-  const [settlements, setSettlements] = useState([]);
   const [recordsOpen, setRecordsOpen] = useState(true);
-  const [expandedRecordId, setExpandedRecordId] = useState(null);
 
-  const [confirmClear, setConfirmClear] = useState(false);
   const [confirmResetAll, setConfirmResetAll] = useState(false);
   const [confirmDeleteProductId, setConfirmDeleteProductId] = useState(null);
-  const [confirmDeleteRecordId, setConfirmDeleteRecordId] = useState(null);
 
   const [view, setView] = useState("lookup");
   const [deliveries, setDeliveries] = useState([]);
@@ -310,10 +269,6 @@ export default function DangaLookup() {
   const [pickerOpen, setPickerOpen] = useState(true);
   const [listOpen, setListOpen] = useState(true);
   const [openRows, setOpenRows] = useState(() => new Set());
-  const [saveNotice, setSaveNotice] = useState("");
-  useEffect(() => {
-    if (view !== "lookup") setSaveNotice("");
-  }, [view]);
 
   function changeFeeRate(v) {
     const n = Number(v);
@@ -323,111 +278,6 @@ export default function DangaLookup() {
       window.storage.set(FEE_KEY, String(next), false).catch(() => {});
     } catch (e) {}
   }
-
-  function addToSelection(v) {
-    setCartOpen(true);
-    setSelection((prev) => {
-      const idx = prev.findIndex((item) => item.id === v.id);
-      if (idx > -1) {
-        const next = [...prev];
-        next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
-        return next;
-      }
-      return [...prev, { id: v.id, name: v.name, reason: v.reason, price: v.price, qty: 1 }];
-    });
-  }
-
-  function incrementQty(id) {
-    setSelection((prev) => prev.map((item) => (item.id === id ? { ...item, qty: item.qty + 1 } : item)));
-  }
-
-  function decrementQty(id) {
-    setSelection((prev) =>
-      prev
-        .map((item) => (item.id === id ? { ...item, qty: item.qty - 1 } : item))
-        .filter((item) => item.qty > 0)
-    );
-  }
-
-  function removeFromSelection(id) {
-    setSelection((prev) => prev.filter((item) => item.id !== id));
-  }
-
-  function clearSelection() {
-    setSelection([]);
-    setConfirmClear(false);
-  }
-
-  async function persistSettlements(next) {
-    setSettlements(next);
-    try {
-      await window.storage.set(SETTLEMENTS_KEY, JSON.stringify(next), false);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  function handleSaveSettlement() {
-    if (!selection.length || !saveDate) return;
-    const frozen = selection.map((i) => ({ ...i, net: netOf(i.price, feeRate) }));
-    const existing = settlements.find((r) => r.date === saveDate);
-
-    if (existing) {
-      const mergedItems = [...existing.items];
-      frozen.forEach((item) => {
-        const idx = mergedItems.findIndex((m) => m.id === item.id);
-        if (idx > -1) {
-          mergedItems[idx] = { ...mergedItems[idx], qty: mergedItems[idx].qty + item.qty };
-        } else {
-          mergedItems.push(item);
-        }
-      });
-      const mergedTotalCount = mergedItems.reduce((sum, i) => sum + i.qty, 0);
-      const mergedTotalPrice = mergedItems.reduce((sum, i) => sum + i.price * i.qty, 0);
-      const updated = {
-        ...existing,
-        items: mergedItems,
-        totalCount: mergedTotalCount,
-        totalPrice: mergedTotalPrice,
-        savedAt: new Date().toISOString(),
-      };
-      persistSettlements(settlements.map((r) => (r.id === existing.id ? updated : r)));
-    } else {
-      const record = {
-        id: Date.now() + "-" + Math.random().toString(36).slice(2),
-        date: saveDate,
-        items: frozen,
-        totalCount,
-        totalPrice,
-        savedAt: new Date().toISOString(),
-      };
-      persistSettlements([record, ...settlements]);
-    }
-
-    setSelection([]);
-    setShowDateInput(false);
-    setCartOpen(false);
-    setRecordsOpen(true);
-    setSaveNotice(`${saveDate} 정산 기록에 저장했어요.`);
-  }
-
-  function handleDeleteRecord(id) {
-    persistSettlements(settlements.filter((r) => r.id !== id));
-    setConfirmDeleteRecordId(null);
-  }
-
-  const selectionMap = useMemo(() => {
-    const m = new Map();
-    selection.forEach((item) => m.set(item.id, item.qty));
-    return m;
-  }, [selection]);
-
-  const totalCount = useMemo(() => selection.reduce((sum, i) => sum + i.qty, 0), [selection]);
-  const totalPrice = useMemo(() => selection.reduce((sum, i) => sum + i.price * i.qty, 0), [selection]);
-  const totalNet = useMemo(
-    () => selection.reduce((sum, i) => sum + netOf(i.price, feeRate) * i.qty, 0),
-    [selection, feeRate]
-  );
 
   const allReasons = useMemo(() => {
     const set = new Set([...DEFAULT_REASONS, ...customReasons]);
@@ -478,38 +328,7 @@ export default function DangaLookup() {
       } catch (e) {
         // 최초 사용, 무시
       }
-      try {
-        const res3 = await window.storage.get(SETTLEMENTS_KEY, false);
-        if (res3 && res3.value) {
-          const loaded = JSON.parse(res3.value);
-          const byDate = new Map();
-          loaded.forEach((r) => {
-            if (!byDate.has(r.date)) {
-              byDate.set(r.date, { ...r, items: [...r.items] });
-            } else {
-              const acc = byDate.get(r.date);
-              r.items.forEach((item) => {
-                const idx = acc.items.findIndex((m) => m.id === item.id);
-                if (idx > -1) acc.items[idx] = { ...acc.items[idx], qty: acc.items[idx].qty + item.qty };
-                else acc.items.push(item);
-              });
-            }
-          });
-          const merged = Array.from(byDate.values()).map((r) => ({
-            ...r,
-            totalCount: r.items.reduce((s, i) => s + i.qty, 0),
-            totalPrice: r.items.reduce((s, i) => s + i.price * i.qty, 0),
-          }));
-          setSettlements(merged);
-          if (merged.length !== loaded.length) {
-            window.storage.set(SETTLEMENTS_KEY, JSON.stringify(merged), false).catch(() => {});
-          }
-        }
-      } catch (e) {
-        // 최초 사용, 무시
-      } finally {
-        setLoaded(true);
-      }
+      setLoaded(true);
     })();
   }, []);
 
@@ -743,7 +562,9 @@ export default function DangaLookup() {
       productName: normalizeName(entry.name),
       reason: (entry.reason || "기본").trim() || "기본",
       productId: entry.id,
-      install: entry.price,
+      install: netOf(entry.price, feeRate),
+      basePrice: entry.price,
+      feeRate,
     };
     let targetId;
     if (pickReplaceId) {
@@ -931,7 +752,8 @@ export default function DangaLookup() {
           <div className="px-4 pb-4 pt-3 border-t border-slate-100">
             <p className="text-xs text-slate-500 mb-2">
               상품명 일부를 검색하고 구분별 단가를 누르면 {deliveryDate} 배송 건이 추가돼요. 정산 페이지의 설치비에는{" "}
-              {deliveryDate} 기준 적용 단가(원단가)가 자동으로 들어가요.
+              {deliveryDate} 기준 적용 단가에서 수수료 {feeRate}%를 뺀 금액이 자동으로 들어가요. (수수료율은 단가
+              조회 탭에서 바꿀 수 있어요)
             </p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -974,8 +796,11 @@ export default function DangaLookup() {
                             >
                               {rg.reason}
                             </span>
-                            <span className="font-mono text-emerald-700 font-semibold text-sm">
-                              {formatPrice(rg.current.price)}
+                            <span className="flex flex-col items-end leading-tight">
+                              <span className="font-mono text-blue-700 font-semibold text-sm">
+                                {formatPrice(netOf(rg.current.price, feeRate))}
+                              </span>
+                              <span className="text-xs text-slate-400">수수료 {feeRate}% 제외</span>
                             </span>
                           </button>
                         ))}
@@ -1262,7 +1087,6 @@ export default function DangaLookup() {
       : "정산서 · 전체";
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, title), "정산서");
-    if (settlements.length > 0) XLSX.utils.book_append_sheet(wb, buildSavedSheet(settlements), "단가 조회 기록");
     downloadWorkbook(wb, `정산서_전체_${todayStr().replace(/-/g, "")}.xlsx`);
   }
 
@@ -1280,7 +1104,7 @@ export default function DangaLookup() {
     settle: [
       "정산 페이지",
       "배송 건을 체크해 정산서를 미리 보고 프린트·엑셀로 받아요",
-      "설치비는 상품 단가가 자동으로 들어가요. 체크한 건은 아래 정산 기록에 날짜별로 쌓여요.",
+      "설치비는 상품 단가에서 수수료를 뺀 금액이 자동으로 들어가요. 체크한 건은 아래 정산 기록에 날짜별로 쌓여요.",
     ],
   };
 
@@ -1520,7 +1344,7 @@ export default function DangaLookup() {
                     {open && (
                       <div className="border-t border-slate-200 p-3 sm:p-4">
                         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                          <Field label="설치비 (자동)">
+                          <Field label="설치비 (수수료 제외)">
                             <input
                               type="text"
                               inputMode="numeric"
@@ -1587,7 +1411,7 @@ export default function DangaLookup() {
             <CalendarDays size={16} />
             정산 기록
             <span className="text-xs font-normal text-slate-400">
-              배송 정산 {deliveryRecords.length}일 · 단가 조회 저장 {settlements.length}건
+              체크한 배송 건 {deliveryRecords.length}일
             </span>
             {recordsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
@@ -1655,87 +1479,6 @@ export default function DangaLookup() {
                 </div>
               )}
             </div>
-            <div className="border-t border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 px-4 pt-3">
-                단가 조회에서 저장한 기록 ({settlements.length}건)
-              </p>
-              {settlements.length === 0 ? (
-                <p className="text-sm text-slate-400 px-4 py-6">
-                  저장된 정산 기록이 없어요. 「단가 조회」 탭에서 정산 목록을 담고 "저장"을 누르면 날짜별로 여기 쌓여요.
-                </p>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {[...settlements]
-                    .sort((a, b) => (a.date < b.date ? 1 : -1))
-                    .map((r) => (
-                      <div key={r.id}>
-                        <div
-                          className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50"
-                          onClick={() => setExpandedRecordId((id) => (id === r.id ? null : r.id))}
-                        >
-                          <span className="text-sm font-semibold w-28 shrink-0">{r.date}</span>
-                          <span className="text-xs text-slate-500 flex-1">{r.totalCount}건</span>
-                          <span className="flex flex-col items-end leading-tight">
-                            <span className="font-mono text-emerald-700 font-semibold text-sm">
-                              원 {formatPrice(r.totalPrice)}
-                            </span>
-                            <span className="font-mono text-blue-700 text-xs">제외 {formatPrice(recordNet(r))}</span>
-                          </span>
-                          {confirmDeleteRecordId !== r.id ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setConfirmDeleteRecordId(r.id);
-                              }}
-                              className="p-1 text-slate-400 hover:text-red-600"
-                              title="삭제"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          ) : (
-                            <span className="flex items-center gap-1 text-xs shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => handleDeleteRecord(r.id)}
-                                className="text-red-600 font-semibold hover:underline px-1"
-                              >
-                                삭제
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteRecordId(null)}
-                                className="text-slate-400 hover:underline px-1"
-                              >
-                                취소
-                              </button>
-                            </span>
-                          )}
-                          {expandedRecordId === r.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </div>
-                        {expandedRecordId === r.id && (
-                          <div className="px-4 pb-3 bg-slate-50">
-                            {r.items.map((item) => (
-                              <div key={item.id} className="flex items-center gap-2 py-1.5 text-sm">
-                                <span className="flex-1 truncate">{item.name}</span>
-                                <span
-                                  className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(
-                                    item.reason
-                                  )}`}
-                                >
-                                  {item.reason || "기본"}
-                                </span>
-                                <span className="text-xs text-slate-500 w-10 text-right">×{item.qty}</span>
-                                <span className="flex flex-col items-end leading-tight w-28">
-                                  <span className="font-mono text-emerald-700">{formatPrice(item.price * item.qty)}</span>
-                                  <span className="font-mono text-blue-700 text-xs">{formatPrice(itemNet(item) * item.qty)}</span>
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>
@@ -1743,7 +1486,7 @@ export default function DangaLookup() {
   );
 
   return (
-    <div className={`min-h-screen bg-slate-50 text-slate-900 ${view === "lookup" && selection.length > 0 ? "pb-20" : ""}`}>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
       <style>{PRINT_CSS}</style>
       {/* 헤더 */}
       <div className="no-print bg-slate-900 text-white px-5 py-6 sm:px-8 sm:py-8">
@@ -1787,23 +1530,6 @@ export default function DangaLookup() {
           settleView
         ) : (
           <>
-        {saveNotice && (
-          <div className="mb-4 flex flex-wrap items-center gap-3 bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
-            <span className="flex-1">{saveNotice}</span>
-            <button
-              onClick={() => {
-                setView("settle");
-                setSaveNotice("");
-              }}
-              className="underline font-semibold"
-            >
-              정산 페이지에서 보기
-            </button>
-            <button onClick={() => setSaveNotice("")} className="text-emerald-700" title="닫기">
-              <X size={14} />
-            </button>
-          </div>
-        )}
         {/* 검색창 */}
         <div className="relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
@@ -1856,21 +1582,12 @@ export default function DangaLookup() {
                     <div className="flex flex-col gap-2">
                       {g.reasonGroups.map((rg) => {
                         const cur = rg.current;
-                        const qty = cur ? selectionMap.get(cur.id) || 0 : 0;
                         const histKey = g.name + "|" + rg.reason;
                         const isHistOpen = expandedHistoryKeys.has(histKey);
                         return (
                           <div key={rg.reason} className="flex flex-col gap-1">
                             <div className="flex items-center flex-wrap gap-2">
-                              <button
-                                onClick={() => cur && addToSelection(cur)}
-                                className={`flex items-center gap-2 border pl-2 pr-3 py-1 transition-colors ${
-                                  qty > 0
-                                    ? "border-amber-500 bg-amber-50"
-                                    : "border-slate-200 bg-slate-50 hover:bg-slate-100"
-                                }`}
-                                title="클릭하면 정산 목록에 추가돼요"
-                              >
+                              <div className="flex items-center gap-2 border border-slate-200 bg-slate-50 pl-2 pr-3 py-1">
                                 <span
                                   className={`text-xs font-semibold px-2 py-0.5 whitespace-nowrap rounded-sm ${reasonStyle(
                                     rg.reason
@@ -1895,12 +1612,7 @@ export default function DangaLookup() {
                                 {cur && cur.effectiveDate && (
                                   <span className="text-xs text-slate-400 whitespace-nowrap">{cur.effectiveDate}~</span>
                                 )}
-                                {qty > 0 && (
-                                  <span className="bg-amber-500 text-slate-900 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                                    {qty}
-                                  </span>
-                                )}
-                              </button>
+                              </div>
                               {rg.history.length > 0 && (
                                 <button
                                   onClick={() => toggleHistory(histKey)}
@@ -1913,16 +1625,11 @@ export default function DangaLookup() {
                             {isHistOpen && (
                               <div className="ml-1 pl-3 border-l-2 border-slate-200 flex flex-col gap-1">
                                 {rg.history.map((h) => (
-                                  <button
-                                    key={h.id}
-                                    onClick={() => addToSelection(h)}
-                                    className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-700 w-fit"
-                                    title="클릭하면 정산 목록에 추가돼요"
-                                  >
+                                  <div key={h.id} className="flex items-center gap-2 text-xs text-slate-500 w-fit">
                                     <span className="whitespace-nowrap">{h.effectiveDate || "날짜 없음"}</span>
                                     <span className="font-mono">원 {formatPrice(h.price)}</span>
                                     <span className="font-mono text-blue-700">제외 {formatPrice(netOf(h.price, feeRate))}</span>
-                                  </button>
+                                  </div>
                                 ))}
                               </div>
                             )}
@@ -2208,118 +1915,6 @@ export default function DangaLookup() {
       {view === "delivery" && printView}
       {view === "settle" && settlePrintView}
 
-      {/* 하단 고정 정산 목록 바 */}
-      {view === "lookup" && selection.length > 0 && (
-        <div className="no-print fixed bottom-0 left-0 right-0 bg-slate-900 text-white shadow-lg z-20">
-          {cartOpen && (
-            <div className="max-w-3xl mx-auto px-5 sm:px-8 pt-3 max-h-64 overflow-y-auto">
-              {selection.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between gap-2 py-2 border-b border-slate-700 text-sm"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate">{item.name}</p>
-                    <span className={`inline-block mt-0.5 text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(item.reason)}`}>
-                      {item.reason || "기본"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      onClick={() => decrementQty(item.id)}
-                      className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-sm text-base"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center">{item.qty}</span>
-                    <button
-                      onClick={() => incrementQty(item.id)}
-                      className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-sm text-base"
-                    >
-                      +
-                    </button>
-                  </div>
-                  <div className="flex flex-col items-end leading-tight w-24 shrink-0 font-mono">
-                    <span className="text-amber-400">{formatPrice(item.price * item.qty)}</span>
-                    <span className="text-xs text-blue-300">{formatPrice(netOf(item.price, feeRate) * item.qty)}</span>
-                  </div>
-                  <button
-                    onClick={() => removeFromSelection(item.id)}
-                    className="text-slate-400 hover:text-red-400 shrink-0"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="max-w-3xl mx-auto px-5 sm:px-8 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-            <div className="flex items-center justify-between sm:flex-1 sm:gap-4">
-              <button onClick={() => setCartOpen((v) => !v)} className="text-sm underline flex items-center gap-1 shrink-0">
-                정산 목록 {totalCount}건
-                {cartOpen ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-              </button>
-              <div className="flex flex-col items-end leading-tight font-mono shrink-0">
-                <span className="text-amber-400 font-bold text-base sm:text-lg">
-                  <span className="text-xs font-normal text-slate-400 mr-1">원단가</span>
-                  {formatPrice(totalPrice)}
-                </span>
-                <span className="text-blue-300 font-semibold text-sm">
-                  <span className="text-xs font-normal text-slate-400 mr-1">수수료 제외</span>
-                  {formatPrice(totalNet)}
-                </span>
-              </div>
-            </div>
-            {!showDateInput ? (
-              <div className="flex items-center justify-end gap-3 shrink-0">
-                <button
-                  onClick={() => setShowDateInput(true)}
-                  className="flex items-center gap-1 bg-amber-500 text-slate-900 font-semibold text-sm px-3 py-1.5 hover:bg-amber-400"
-                >
-                  <Save size={14} />
-                  저장
-                </button>
-                {!confirmClear ? (
-                  <button onClick={() => setConfirmClear(true)} className="text-xs text-slate-400 hover:text-white">
-                    초기화
-                  </button>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs">
-                    <button onClick={clearSelection} className="text-red-400 font-semibold hover:underline">
-                      비우기
-                    </button>
-                    <button onClick={() => setConfirmClear(false)} className="text-slate-400 hover:underline">
-                      취소
-                    </button>
-                  </span>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-end gap-2 shrink-0 flex-wrap">
-                <input
-                  type="date"
-                  value={saveDate}
-                  onChange={(e) => setSaveDate(e.target.value)}
-                  className="bg-slate-800 border border-slate-600 text-white text-base px-2 py-1.5 focus:outline-none focus:border-amber-500"
-                />
-                <button
-                  onClick={handleSaveSettlement}
-                  className="flex items-center gap-1 bg-amber-500 text-slate-900 font-semibold text-sm px-3 py-1.5 hover:bg-amber-400"
-                >
-                  <Check size={14} />
-                  확인
-                </button>
-                <button
-                  onClick={() => setShowDateInput(false)}
-                  className="text-slate-400 hover:text-white px-1"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
