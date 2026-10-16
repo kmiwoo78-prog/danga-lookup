@@ -125,6 +125,13 @@ function buildGroups(list, asOf) {
         return { reason, current: idx > -1 ? sorted[idx] : sorted[sorted.length - 1] };
       }),
     }))
+    .map((g) => ({
+      ...g,
+      reasonGroups: [
+        ...g.reasonGroups.filter((rg) => rg.reason === "기본"),
+        ...g.reasonGroups.filter((rg) => rg.reason !== "기본"),
+      ],
+    }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 const SHEET_HEAD = ["번호", "상태", "배송일", "송장번호", "박스", "상품명", "주소", "메모", "설치비", "양중비", "내림비", "기타비용", "합계"];
@@ -259,6 +266,7 @@ export default function DangaLookup() {
   const [deliveryDate, setDeliveryDate] = useState(() => todayStr());
   const [pickQuery, setPickQuery] = useState("");
   const [pickReplaceId, setPickReplaceId] = useState(null);
+  const [pickSel, setPickSel] = useState({ name: "", reasons: [] });
   const [confirmDeleteDeliveryId, setConfirmDeleteDeliveryId] = useState(null);
   const [showDeliveryPreview, setShowDeliveryPreview] = useState(false);
   const [settleListOpen, setSettleListOpen] = useState(true);
@@ -557,13 +565,20 @@ export default function DangaLookup() {
       return next;
     });
   }
-  function pickProduct(entry) {
+  function pickProducts(entries) {
+    if (!entries.length) return;
+    const parts = entries.map((e) => ({
+      reason: (e.reason || "기본").trim() || "기본",
+      price: e.price,
+      net: netOf(e.price, feeRate),
+    }));
     const base = {
-      productName: normalizeName(entry.name),
-      reason: (entry.reason || "기본").trim() || "기본",
-      productId: entry.id,
-      install: netOf(entry.price, feeRate),
-      basePrice: entry.price,
+      productName: normalizeName(entries[0].name),
+      reason: parts.map((x) => x.reason).join("+"),
+      productId: entries[0].id,
+      install: parts.reduce((sum, x) => sum + x.net, 0),
+      basePrice: parts.reduce((sum, x) => sum + x.price, 0),
+      priceParts: parts,
       feeRate,
     };
     let targetId;
@@ -593,6 +608,7 @@ export default function DangaLookup() {
     setOpenRows((prev) => new Set(prev).add(targetId));
     setListOpen(true);
     setPickerOpen(false);
+    setPickSel({ name: "", reasons: [] });
     scrollToRow(targetId);
   }
   function handleDeleteDelivery(id) {
@@ -753,14 +769,18 @@ export default function DangaLookup() {
             <p className="text-xs text-slate-500 mb-2">
               상품명 일부를 검색하고 구분별 단가를 누르면 {deliveryDate} 배송 건이 추가돼요. 정산 페이지의 설치비에는{" "}
               {deliveryDate} 기준 적용 단가에서 수수료 {feeRate}%를 뺀 금액이 자동으로 들어가요. (수수료율은 단가
-              조회 탭에서 바꿀 수 있어요)
+              조회 탭에서 바꿀 수 있어요) 같은 상품에 단가가 여러 개 보이면 원하는 구분을 모두 선택해 한 번에 추가할 수
+              있고, 선택한 단가(수수료 제외)는 설치비에 합산돼요.
             </p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
                 type="text"
                 value={pickQuery}
-                onChange={(e) => setPickQuery(e.target.value)}
+                onChange={(e) => {
+                  setPickQuery(e.target.value);
+                  setPickSel({ name: "", reasons: [] });
+                }}
                 placeholder="예: 이즈 카이"
                 className="w-full border-2 border-slate-900 pl-9 pr-3 py-2 text-base focus:outline-none focus:border-amber-500"
               />
@@ -778,35 +798,97 @@ export default function DangaLookup() {
                 <p className="text-sm text-slate-500 mt-3">일치하는 상품이 없어요.</p>
               ) : (
                 <div className="mt-3 border border-slate-200 divide-y divide-slate-200 max-h-80 overflow-y-auto">
-                  {pickGroups.map((g) => (
-                    <div key={g.name} className="px-3 py-2">
-                      <div className="text-sm leading-snug mb-1">
-                        <Highlighted text={g.name} tokens={pickTokens} />
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {g.reasonGroups.map((rg) => (
-                          <button
-                            key={rg.reason}
-                            onClick={() => pickProduct(rg.current)}
-                            className="flex items-center gap-2 border border-slate-200 bg-slate-50 hover:bg-slate-100 pl-2 pr-3 py-1"
-                            title="클릭하면 배송 건으로 추가돼요"
-                          >
-                            <span
-                              className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(rg.reason)}`}
+                  {pickGroups.map((g) => {
+                    const multi = g.reasonGroups.length > 1;
+                    const selEntries =
+                      multi && pickSel.name === g.name
+                        ? pickSel.reasons
+                            .map((r) => g.reasonGroups.find((rg) => rg.reason === r))
+                            .filter(Boolean)
+                            .map((rg) => rg.current)
+                        : [];
+                    const selSum = selEntries.reduce((sum, e) => sum + netOf(e.price, feeRate), 0);
+                    return (
+                      <div key={g.name} className="px-3 py-2">
+                        <div className="text-sm leading-snug mb-1">
+                          <Highlighted text={g.name} tokens={pickTokens} />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {g.reasonGroups.map((rg) => {
+                            const checked = multi && pickSel.name === g.name && pickSel.reasons.includes(rg.reason);
+                            return (
+                              <button
+                                key={rg.reason}
+                                onClick={() => {
+                                  if (!multi) {
+                                    pickProducts([rg.current]);
+                                    return;
+                                  }
+                                  setPickSel((prev) => {
+                                    if (prev.name !== g.name) return { name: g.name, reasons: [rg.reason] };
+                                    const has = prev.reasons.includes(rg.reason);
+                                    return {
+                                      name: g.name,
+                                      reasons: has
+                                        ? prev.reasons.filter((r) => r !== rg.reason)
+                                        : [...prev.reasons, rg.reason],
+                                    };
+                                  });
+                                }}
+                                aria-pressed={multi ? checked : undefined}
+                                className={`flex items-center gap-2 border pl-2 pr-3 py-1 ${
+                                  checked
+                                    ? "border-amber-500 bg-amber-50"
+                                    : "border-slate-200 bg-slate-50 hover:bg-slate-100"
+                                }`}
+                                title={multi ? "여러 개를 선택하면 설치비에 합산돼요" : "클릭하면 배송 건으로 추가돼요"}
+                              >
+                                {multi && (
+                                  <span
+                                    className={`w-4 h-4 border flex items-center justify-center shrink-0 ${
+                                      checked ? "bg-amber-500 border-amber-500 text-slate-900" : "border-slate-400 bg-white"
+                                    }`}
+                                  >
+                                    {checked && <Check size={12} />}
+                                  </span>
+                                )}
+                                <span
+                                  className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(rg.reason)}`}
+                                >
+                                  {rg.reason}
+                                </span>
+                                <span className="flex flex-col items-end leading-tight">
+                                  <span className="font-mono text-blue-700 font-semibold text-sm">
+                                    {formatPrice(netOf(rg.current.price, feeRate))}
+                                  </span>
+                                  <span className="text-xs text-slate-400">수수료 {feeRate}% 제외</span>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {multi && selEntries.length === 0 && (
+                          <p className="text-xs text-slate-400 mt-1">
+                            단가가 {g.reasonGroups.length}개 있어요. 원하는 구분을 모두 선택하면 설치비에 합산돼요.
+                          </p>
+                        )}
+                        {multi && selEntries.length > 0 && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <button
+                              onClick={() => pickProducts(selEntries)}
+                              className="bg-amber-500 text-slate-900 font-semibold text-sm px-3 py-1.5 hover:bg-amber-400"
                             >
-                              {rg.reason}
+                              선택한 {selEntries.length}개로 {pickReplaceId ? "상품 변경" : "배송 건 추가"}
+                            </button>
+                            <span className="text-xs text-slate-500">
+                              설치비 합산{" "}
+                              <b className="font-mono text-blue-700">{formatPrice(selSum)}</b> (수수료 {feeRate}% 제외)
                             </span>
-                            <span className="flex flex-col items-end leading-tight">
-                              <span className="font-mono text-blue-700 font-semibold text-sm">
-                                {formatPrice(netOf(rg.current.price, feeRate))}
-                              </span>
-                              <span className="text-xs text-slate-400">수수료 {feeRate}% 제외</span>
-                            </span>
-                          </button>
-                        ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ))}
           </div>
@@ -968,6 +1050,12 @@ export default function DangaLookup() {
                           </button>
                         </div>
 
+                        {d.priceParts && d.priceParts.length > 1 && (
+                          <p className="text-xs text-slate-500 mb-3">
+                            설치비 구성 (수수료 제외):{" "}
+                            {d.priceParts.map((x) => `${x.reason} ${formatPrice(x.net)}`).join(" + ")}
+                          </p>
+                        )}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <Field label="송장번호">
                             <input
