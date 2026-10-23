@@ -19,11 +19,13 @@ const PRINT_CSS = `
 .print-table th { background: #eee; }
 .print-table .num { text-align: right; white-space: nowrap; }
 .print-table tfoot td { font-weight: 700; background: #f5f5f5; }
-table.print-table.delivery-table { table-layout: fixed; margin: 0 auto; font-size: 15px; }
-table.print-table.delivery-table th, table.print-table.delivery-table td { text-align: center; vertical-align: middle; padding: 8px 10px; word-break: keep-all; overflow-wrap: anywhere; }
+table.print-table.delivery-table { table-layout: fixed; margin: 0 auto; font-size: 7.5px; }
+table.print-table.delivery-table th, table.print-table.delivery-table td { text-align: center; vertical-align: middle; padding: 4px 6px; word-break: keep-all; overflow-wrap: anywhere; }
+table.print-table.delivery-table th:nth-child(1), table.print-table.delivery-table td:nth-child(1), table.print-table.delivery-table th:nth-child(2), table.print-table.delivery-table td:nth-child(2) { padding-left: 2px; padding-right: 2px; }
+.delivery-title { font-size: 9px; font-weight: 700; margin-bottom: 4px; text-align: center; }
 table.print-table.delivery-table td.left, table.print-table.delivery-table td.time-cell { text-align: left; }
-.tp-on { display: inline-block; border: 1.5px solid #111; border-radius: 3px; padding: 0 6px; font-weight: 700; }
-.tp-off { display: inline-block; padding: 0 7.5px; color: #9ca3af; }
+.tp-on { display: inline-block; border: 1px solid #111; border-radius: 2px; padding: 0 3px; font-weight: 700; }
+.tp-off { display: inline-block; padding: 0 4px; color: #9ca3af; }
 .tp-note { margin-left: 4px; }
 table.print-table.settle-table th, table.print-table.settle-table td { text-align: center; vertical-align: middle; }
 table.print-table.settle-table td.left { text-align: left; }
@@ -39,6 +41,9 @@ table.print-table.settle-table td.num { text-align: right; }
   .print-table th, .print-table td { padding: 3px 4px; }
   table.print-table.delivery-table { font-size: 18px; }
   table.print-table.delivery-table th, table.print-table.delivery-table td { padding: 10px 12px; }
+  .delivery-title { font-size: 18px; margin-bottom: 8px; }
+  .tp-on { border-width: 1.5px; border-radius: 3px; padding: 0 6px; }
+  .tp-off { padding: 0 7.5px; }
 }
 `;
 const DEFAULT_REASONS = ["기본", "재출고", "프로모션", "내림서비스"];
@@ -807,15 +812,15 @@ export default function DangaLookup() {
 
   const deliverySheet = (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, textAlign: "center" }}>배송 리스트 · {deliveryDate}</h2>
+      <h2 className="delivery-title">배송 리스트 · {deliveryDate}</h2>
       <table className="print-table delivery-table">
         <colgroup>
-          <col style={{ width: "13%" }} />
-          <col style={{ width: "7%" }} />
-          <col style={{ width: "29%" }} />
-          <col style={{ width: "26%" }} />
+          <col style={{ width: "10%" }} />
+          <col style={{ width: "5%" }} />
+          <col style={{ width: "31%" }} />
+          <col style={{ width: "28%" }} />
           <col style={{ width: "12%" }} />
-          <col style={{ width: "13%" }} />
+          <col style={{ width: "14%" }} />
         </colgroup>
         <thead>
           <tr>
@@ -927,7 +932,7 @@ export default function DangaLookup() {
             </button>
           </div>
           <div className="overflow-x-auto">
-            <div style={{ minWidth: 720 }}>{deliverySheet}</div>
+            <div style={{ minWidth: 440, maxWidth: 620, margin: "0 auto" }}>{deliverySheet}</div>
           </div>
         </div>
       )}
