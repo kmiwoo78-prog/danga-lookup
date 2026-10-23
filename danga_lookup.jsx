@@ -21,7 +21,15 @@ const PRINT_CSS = `
 .print-table tfoot td { font-weight: 700; background: #f5f5f5; }
 table.print-table.delivery-table { table-layout: fixed; margin: 0 auto; font-size: 15px; }
 table.print-table.delivery-table th, table.print-table.delivery-table td { text-align: center; vertical-align: middle; padding: 8px 10px; word-break: keep-all; overflow-wrap: anywhere; }
+table.print-table.delivery-table td.left, table.print-table.delivery-table td.time-cell { text-align: left; }
+.tp-on { display: inline-block; border: 1.5px solid #111; border-radius: 3px; padding: 0 6px; font-weight: 700; }
+.tp-off { display: inline-block; padding: 0 7.5px; color: #9ca3af; }
+.tp-note { margin-left: 4px; }
+table.print-table.settle-table th, table.print-table.settle-table td { text-align: center; vertical-align: middle; }
+table.print-table.settle-table td.left { text-align: left; }
+table.print-table.settle-table td.num { text-align: right; }
 @media print {
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { size: A4 landscape; margin: 8mm; }
   .no-print { display: none !important; }
   .print-only { display: block !important; }
@@ -131,13 +139,30 @@ function buildGroups(list, asOf) {
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
-const SHEET_HEAD = ["번호", "상태", "배송일", "송장번호", "박스", "상품명", "주소", "메모", "설치비", "양중비", "내림비", "기타비용", "합계"];
+const SHEET_HEAD = ["구분", "상태", "배송일", "송장번호", "박스", "상품명", "주소", "메모", "설치비", "양중비", "내림비", "기타비용", "합계"];
 const FLAG_LIST = [
-  { key: "direct", label: "직접설치" },
-  { key: "reship", label: "재출고" },
-  { key: "postpone", label: "연기" },
-  { key: "exchange", label: "교환" },
+  { key: "direct", label: "직접설치", color: "#dc2626", badge: "bg-red-100 text-red-700" },
+  { key: "reship", label: "재출고", color: "#2563eb", badge: "bg-blue-100 text-blue-700" },
+  { key: "postpone", label: "연기", color: "#db2777", badge: "bg-pink-100 text-pink-700" },
+  { key: "exchange", label: "교환", color: "#ea580c", badge: "bg-orange-100 text-orange-700" },
+  { key: "partial", label: "부분출고", color: "#16a34a", badge: "bg-green-100 text-green-700" },
 ];
+function flagsText(d) {
+  return FLAG_LIST.filter((f) => d.flags && d.flags[f.key])
+    .map((f) => f.label)
+    .join(", ");
+}
+function shortDate(str) {
+  const m = String(str || "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  return m ? `${Number(m[2])}/${Number(m[3])}` : String(str || "");
+}
+function FlagLines({ d }) {
+  return FLAG_LIST.filter((f) => d.flags && d.flags[f.key]).map((f) => (
+    <div key={f.key} style={{ color: f.color, fontWeight: 700 }}>
+      {f.label}
+    </div>
+  ));
+}
 const MODE_LABEL = { net: "수수료 제외", applied: "적용단가", manual: "직접 수정" };
 function uid() {
   return Date.now() + "-" + Math.random().toString(36).slice(2);
@@ -194,9 +219,9 @@ function buildSettleSheet(rows, title) {
   const sums = [0, 0, 0, 0, 0];
   rows.forEach((d, i) => {
     aoa.push([
-      i + 1,
+      flagsText(d),
       d.status || "",
-      d.date || "",
+      shortDate(d.date || ""),
       d.invoice || "",
       d.box || "",
       productLabel(d),
@@ -255,6 +280,11 @@ function excelCellToDateStr(raw) {
   const s = String(raw).trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   if (/^\d{4}-\d{2}$/.test(s)) return s + "-01";
+  const kor = s.match(/^(\d{2}|\d{4})\s*년\s*(\d{1,2})\s*월$/);
+  if (kor) {
+    const y = kor[1].length === 2 ? 2000 + Number(kor[1]) : Number(kor[1]);
+    return `${y}-${String(kor[2]).padStart(2, "0")}-01`;
+  }
   if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)) {
     const [y, m, d] = s.split("/");
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
@@ -780,32 +810,47 @@ export default function DangaLookup() {
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, textAlign: "center" }}>배송 리스트 · {deliveryDate}</h2>
       <table className="print-table delivery-table">
         <colgroup>
-          <col style={{ width: "16%" }} />
-          <col style={{ width: "8%" }} />
-          <col style={{ width: "30%" }} />
-          <col style={{ width: "28%" }} />
-          <col style={{ width: "18%" }} />
+          <col style={{ width: "13%" }} />
+          <col style={{ width: "7%" }} />
+          <col style={{ width: "29%" }} />
+          <col style={{ width: "26%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "13%" }} />
         </colgroup>
         <thead>
           <tr>
-            <th>송장번호</th>
+            <th>구분</th>
             <th>박스</th>
             <th>상품명</th>
             <th>주소</th>
+            <th>시간</th>
             <th>메모</th>
           </tr>
         </thead>
         <tbody>
           {dayRows.map((d) => (
             <tr key={d.id}>
-              <td>{d.invoice}</td>
-              <td>{d.box}</td>
               <td>
+                <FlagLines d={d} />
+              </td>
+              <td>{d.box}</td>
+              <td className="left">
                 {itemsOf(d).map((it, i) => (
                   <div key={it.id || i}>{itemLabel(it)}</div>
                 ))}
               </td>
-              <td>{d.address}</td>
+              <td className="left">{d.address}</td>
+              <td className="time-cell">
+                <div>
+                  <span className={d.timePeriod === "AM" ? "tp-on" : "tp-off"}>AM</span>
+                  {d.timePeriod === "AM" && d.timeNote ? <span className="tp-note">{d.timeNote}</span> : null}
+                </div>
+                <div>
+                  <span className={d.timePeriod === "PM" ? "tp-on" : "tp-off"}>PM</span>
+                  {d.timePeriod === "PM" && d.timeNote ? <span className="tp-note">{d.timeNote}</span> : null}
+                </div>
+                {!d.timePeriod && d.timeNote ? <div className="tp-note">{d.timeNote}</div> : null}
+              </td>
               <td>{d.memo}</td>
             </tr>
           ))}
@@ -882,7 +927,7 @@ export default function DangaLookup() {
             </button>
           </div>
           <div className="overflow-x-auto">
-            <div style={{ minWidth: 640 }}>{deliverySheet}</div>
+            <div style={{ minWidth: 720 }}>{deliverySheet}</div>
           </div>
         </div>
       )}
@@ -1081,11 +1126,17 @@ export default function DangaLookup() {
                             {FLAG_LIST.filter((f) => flags[f.key]).map((f) => (
                               <span
                                 key={f.key}
-                                className="text-xs font-semibold px-1.5 py-0.5 rounded-sm shrink-0 bg-slate-800 text-white"
+                                className={`text-xs font-semibold px-1.5 py-0.5 rounded-sm shrink-0 ${f.badge}`}
                               >
                                 {f.label}
                               </span>
                             ))}
+                            {d.timePeriod && (
+                              <span className="text-xs font-semibold px-1.5 py-0.5 rounded-sm shrink-0 bg-slate-200 text-slate-700">
+                                {d.timePeriod}
+                                {d.timeNote ? ` ${d.timeNote}` : ""}
+                              </span>
+                            )}
                             <span className="block text-sm truncate">
                               {its.length ? itemLabel(its[0]) : "상품 없음"}
                               {its.length > 1 ? ` 외 ${its.length - 1}건` : ""}
@@ -1159,6 +1210,31 @@ export default function DangaLookup() {
                           )}
                         </div>
 
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          <span className="text-xs text-slate-500">시간</span>
+                          {["AM", "PM"].map((tp) => (
+                            <button
+                              key={tp}
+                              onClick={() => updateDelivery(d.id, { timePeriod: d.timePeriod === tp ? "" : tp })}
+                              aria-pressed={d.timePeriod === tp}
+                              className={`px-3 py-1 text-sm font-semibold border ${
+                                d.timePeriod === tp
+                                  ? "border-slate-900 bg-slate-900 text-white"
+                                  : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                              }`}
+                            >
+                              {tp}
+                            </button>
+                          ))}
+                          <input
+                            type="text"
+                            value={d.timeNote || ""}
+                            onChange={(e) => updateDelivery(d.id, { timeNote: e.target.value })}
+                            placeholder="시간 상세 (예: 10시 이후)"
+                            aria-label="시간 상세"
+                            className="flex-1 basis-40 min-w-0 border border-slate-300 px-2 py-1 text-base focus:outline-none focus:border-slate-900"
+                          />
+                        </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           <Field label="송장번호">
                             <input
@@ -1361,10 +1437,10 @@ export default function DangaLookup() {
       <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
         정산서 · {deliveryDate} (선택 {settleSel.length}건)
       </h2>
-      <table className="print-table">
+      <table className="print-table settle-table">
         <thead>
           <tr>
-            <th>번호</th>
+            <th>구분</th>
             <th>상태</th>
             <th>배송일</th>
             <th>송장번호</th>
@@ -1382,13 +1458,15 @@ export default function DangaLookup() {
         <tbody>
           {settleSel.map((d, i) => (
             <tr key={d.id}>
-              <td>{i + 1}</td>
+              <td>
+                <FlagLines d={d} />
+              </td>
               <td>{d.status}</td>
-              <td>{d.date}</td>
+              <td>{shortDate(d.date)}</td>
               <td>{d.invoice}</td>
               <td>{d.box}</td>
-              <td>{productLabel(d)}</td>
-              <td>{d.address}</td>
+              <td className="left">{productLabel(d)}</td>
+              <td className="left">{d.address}</td>
               <td>{d.memo}</td>
               <td className="num">{fmtNum(d.install)}</td>
               <td className="num">{fmtNum(d.lift)}</td>
@@ -1581,7 +1659,7 @@ export default function DangaLookup() {
                             {FLAG_LIST.filter((f) => d.flags && d.flags[f.key]).map((f) => (
                               <span
                                 key={f.key}
-                                className="text-xs font-semibold px-1.5 py-0.5 rounded-sm shrink-0 bg-slate-800 text-white"
+                                className={`text-xs font-semibold px-1.5 py-0.5 rounded-sm shrink-0 ${f.badge}`}
                               >
                                 {f.label}
                               </span>
