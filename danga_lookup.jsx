@@ -19,13 +19,13 @@ const PRINT_CSS = `
 .print-table th { background: #eee; }
 .print-table .num { text-align: right; white-space: nowrap; }
 .print-table tfoot td { font-weight: 700; background: #f5f5f5; }
-table.print-table.delivery-table { table-layout: fixed; margin: 0 auto; font-size: 7.5px; }
-table.print-table.delivery-table th, table.print-table.delivery-table td { text-align: center; vertical-align: middle; padding: 4px 6px; word-break: keep-all; overflow-wrap: anywhere; }
+table.print-table.delivery-table { table-layout: fixed; margin: 0 auto; font-size: 15px; }
+table.print-table.delivery-table th, table.print-table.delivery-table td { text-align: center; vertical-align: middle; padding: 8px 10px; word-break: keep-all; overflow-wrap: anywhere; }
 table.print-table.delivery-table th:nth-child(1), table.print-table.delivery-table td:nth-child(1), table.print-table.delivery-table th:nth-child(2), table.print-table.delivery-table td:nth-child(2) { padding-left: 2px; padding-right: 2px; }
-.delivery-title { font-size: 9px; font-weight: 700; margin-bottom: 4px; text-align: center; }
+.delivery-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; text-align: center; }
 table.print-table.delivery-table td.left, table.print-table.delivery-table td.time-cell { text-align: left; }
-.tp-on { display: inline-block; border: 1px solid #111; border-radius: 2px; padding: 0 3px; font-weight: 700; }
-.tp-off { display: inline-block; padding: 0 4px; color: #9ca3af; }
+.tp-on { display: inline-block; border: 1.5px solid #111; border-radius: 3px; padding: 0 6px; font-weight: 700; }
+.tp-off { display: inline-block; padding: 0 7.5px; color: #9ca3af; }
 .tp-note { margin-left: 4px; }
 table.print-table.settle-table th, table.print-table.settle-table td { text-align: center; vertical-align: middle; }
 table.print-table.settle-table td.left { text-align: left; }
@@ -39,11 +39,11 @@ table.print-table.settle-table td.num { text-align: right; }
   .bg-slate-50 { background: #fff !important; }
   .print-table { font-size: 10px; }
   .print-table th, .print-table td { padding: 3px 4px; }
-  table.print-table.delivery-table { font-size: 18px; }
-  table.print-table.delivery-table th, table.print-table.delivery-table td { padding: 10px 12px; }
-  .delivery-title { font-size: 18px; margin-bottom: 8px; }
-  .tp-on { border-width: 1.5px; border-radius: 3px; padding: 0 6px; }
-  .tp-off { padding: 0 7.5px; }
+  table.print-table.delivery-table { font-size: 9px; }
+  table.print-table.delivery-table th, table.print-table.delivery-table td { padding: 5px 6px; }
+  .delivery-title { font-size: 9px; margin-bottom: 4px; }
+  .tp-on { border-width: 1px; border-radius: 2px; padding: 0 3px; }
+  .tp-off { padding: 0 4px; }
 }
 `;
 const DEFAULT_REASONS = ["기본", "재출고", "프로모션", "내림서비스"];
@@ -221,48 +221,62 @@ function setNumFmt(ws, cols, fromRow, toRow) {
 }
 function buildSettleSheet(rows, title) {
   const aoa = [[title], SHEET_HEAD];
+  const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 12 } }];
+  const groups = [];
   const sums = [0, 0, 0, 0, 0];
-  rows.forEach((d, i) => {
-    aoa.push([
-      flagsText(d),
-      d.status || "",
-      shortDate(d.date || ""),
-      d.invoice || "",
-      d.box || "",
-      productLabel(d),
-      d.address || "",
-      d.memo || "",
-      d.install || 0,
-      d.lift || 0,
-      d.unload || 0,
-      d.etc || 0,
-      deliveryTotal(d),
-    ]);
-    sums[0] += d.install || 0;
+  rows.forEach((d) => {
+    const its = itemsOf(d);
+    const lines = its.length ? its : [null];
+    const first = aoa.length + 1;
+    lines.forEach((it, k) => {
+      const inst = it ? Number(it.price) || 0 : d.install || 0;
+      aoa.push([
+        k === 0 ? flagsText(d) : null,
+        k === 0 ? d.status || "" : null,
+        k === 0 ? shortDate(d.date || "") : null,
+        k === 0 ? d.invoice || "" : null,
+        k === 0 ? d.box || "" : null,
+        it ? itemLabel(it) : "",
+        k === 0 ? d.address || "" : null,
+        k === 0 ? d.memo || "" : null,
+        inst,
+        k === 0 ? d.lift || 0 : null,
+        k === 0 ? d.unload || 0 : null,
+        k === 0 ? d.etc || 0 : null,
+        k === 0 ? deliveryTotal(d) : null,
+      ]);
+      sums[0] += inst;
+    });
     sums[1] += d.lift || 0;
     sums[2] += d.unload || 0;
     sums[3] += d.etc || 0;
     sums[4] += deliveryTotal(d);
+    groups.push({ d, first, last: first + lines.length - 1 });
+    if (lines.length > 1) merges.push({ s: { r: first - 1, c: 6 }, e: { r: first + lines.length - 2, c: 6 } });
   });
-  aoa.push([`선택 ${rows.length}건 합계`, "", "", "", "", "", "", "", ...sums]);
+  const firstRow = 3;
+  const lastRow = aoa.length;
+  const foot = aoa.length + 1;
+  aoa.push([`선택 ${rows.length}건 합계`, null, null, null, null, null, null, null, ...sums]);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const first = 3;
-  const last = 2 + rows.length;
-  const foot = 3 + rows.length;
-  rows.forEach((d, i) => {
-    const r = first + i;
-    ws["M" + r] = { t: "n", f: `SUM(I${r}:L${r})`, v: deliveryTotal(d) };
+  groups.forEach((g) => {
+    ws["M" + g.first] = {
+      t: "n",
+      f:
+        g.last === g.first
+          ? `SUM(I${g.first}:L${g.first})`
+          : `SUM(I${g.first}:I${g.last})+SUM(J${g.first}:L${g.first})`,
+      v: deliveryTotal(g.d),
+    };
   });
   ["I", "J", "K", "L", "M"].forEach((c, k) => {
-    ws[c + foot] = rows.length
-      ? { t: "n", f: `SUM(${c}${first}:${c}${last})`, v: sums[k] }
+    ws[c + foot] = lastRow >= firstRow
+      ? { t: "n", f: `SUM(${c}${firstRow}:${c}${lastRow})`, v: sums[k] }
       : { t: "n", v: 0 };
   });
-  setNumFmt(ws, ["I", "J", "K", "L", "M"], first, foot);
-  ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 12 } },
-    { s: { r: foot - 1, c: 0 }, e: { r: foot - 1, c: 7 } },
-  ];
+  setNumFmt(ws, ["I", "J", "K", "L", "M"], firstRow, foot);
+  merges.push({ s: { r: foot - 1, c: 0 }, e: { r: foot - 1, c: 7 } });
+  ws["!merges"] = merges;
   ws["!cols"] = [6, 6, 11, 14, 8, 42, 36, 20, 10, 10, 10, 10, 12].map((w) => ({ wch: w }));
   return ws;
 }
@@ -817,10 +831,9 @@ export default function DangaLookup() {
         <colgroup>
           <col style={{ width: "10%" }} />
           <col style={{ width: "5%" }} />
-          <col style={{ width: "31%" }} />
-          <col style={{ width: "28%" }} />
-          <col style={{ width: "12%" }} />
-          <col style={{ width: "14%" }} />
+          <col style={{ width: "35%" }} />
+          <col style={{ width: "35%" }} />
+          <col style={{ width: "15%" }} />
         </colgroup>
         <thead>
           <tr>
@@ -829,7 +842,6 @@ export default function DangaLookup() {
             <th>상품명</th>
             <th>주소</th>
             <th>시간</th>
-            <th>메모</th>
           </tr>
         </thead>
         <tbody>
@@ -856,7 +868,6 @@ export default function DangaLookup() {
                 </div>
                 {!d.timePeriod && d.timeNote ? <div className="tp-note">{d.timeNote}</div> : null}
               </td>
-              <td>{d.memo}</td>
             </tr>
           ))}
         </tbody>
@@ -932,7 +943,7 @@ export default function DangaLookup() {
             </button>
           </div>
           <div className="overflow-x-auto">
-            <div style={{ minWidth: 440, maxWidth: 620, margin: "0 auto" }}>{deliverySheet}</div>
+            <div style={{ minWidth: 720 }}>{deliverySheet}</div>
           </div>
         </div>
       )}
@@ -1461,25 +1472,31 @@ export default function DangaLookup() {
           </tr>
         </thead>
         <tbody>
-          {settleSel.map((d, i) => (
-            <tr key={d.id}>
-              <td>
-                <FlagLines d={d} />
-              </td>
-              <td>{d.status}</td>
-              <td>{shortDate(d.date)}</td>
-              <td>{d.invoice}</td>
-              <td>{d.box}</td>
-              <td className="left">{productLabel(d)}</td>
-              <td className="left">{d.address}</td>
-              <td>{d.memo}</td>
-              <td className="num">{fmtNum(d.install)}</td>
-              <td className="num">{fmtNum(d.lift)}</td>
-              <td className="num">{fmtNum(d.unload)}</td>
-              <td className="num">{fmtNum(d.etc)}</td>
-              <td className="num">{fmtNum(deliveryTotal(d))}</td>
-            </tr>
-          ))}
+          {settleSel.flatMap((d) => {
+            const its = itemsOf(d);
+            const lines = its.length ? its : [null];
+            return lines.map((it, k) => (
+              <tr key={d.id + "-" + k}>
+                <td>{k === 0 ? <FlagLines d={d} /> : null}</td>
+                <td>{k === 0 ? d.status : null}</td>
+                <td>{k === 0 ? shortDate(d.date) : null}</td>
+                <td>{k === 0 ? d.invoice : null}</td>
+                <td>{k === 0 ? d.box : null}</td>
+                <td className="left">{it ? itemLabel(it) : ""}</td>
+                {k === 0 && (
+                  <td className="left" rowSpan={lines.length}>
+                    {d.address}
+                  </td>
+                )}
+                <td>{k === 0 ? d.memo : null}</td>
+                <td className="num">{fmtNum(it ? it.price : k === 0 ? d.install : 0)}</td>
+                <td className="num">{k === 0 ? fmtNum(d.lift) : null}</td>
+                <td className="num">{k === 0 ? fmtNum(d.unload) : null}</td>
+                <td className="num">{k === 0 ? fmtNum(d.etc) : null}</td>
+                <td className="num">{k === 0 ? fmtNum(deliveryTotal(d)) : null}</td>
+              </tr>
+            ));
+          })}
         </tbody>
         <tfoot>
           <tr>
