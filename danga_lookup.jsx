@@ -751,9 +751,12 @@ export default function DangaLookup() {
   function openPickerFor(target) {
     setPickTarget(target);
     setPickerOpen(true);
-    try {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (e) {}
+    setTimeout(() => {
+      try {
+        const el = document.getElementById("delivery-picker");
+        if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (e) {}
+    }, 60);
   }
   function handleDeleteDelivery(id) {
     persistDeliveries(deliveries.filter((d) => d.id !== id));
@@ -824,15 +827,34 @@ export default function DangaLookup() {
   const inputCls = "w-full border border-slate-300 px-2 py-1.5 text-base focus:outline-none focus:border-slate-900";
   const moneyCls = inputCls + " font-mono text-right";
 
+  const sheetRows = dayRows
+    .map((d, i) => ({ d, i }))
+    .sort((x, y) => {
+      const xa = normalizeName(x.d.address);
+      const ya = normalizeName(y.d.address);
+      if (!xa && !ya) return x.i - y.i;
+      if (!xa) return 1;
+      if (!ya) return -1;
+      return xa.localeCompare(ya) || x.i - y.i;
+    })
+    .map((x) => x.d);
+  const addrSpans = sheetRows.map((d, i) => {
+    const a = normalizeName(d.address);
+    if (!a) return 1;
+    if (i > 0 && normalizeName(sheetRows[i - 1].address) === a) return 0;
+    let n = 1;
+    while (i + n < sheetRows.length && normalizeName(sheetRows[i + n].address) === a) n++;
+    return n;
+  });
   const deliverySheet = (
     <div>
       <h2 className="delivery-title">배송 리스트 · {deliveryDate}</h2>
       <table className="print-table delivery-table">
         <colgroup>
-          <col style={{ width: "10%" }} />
-          <col style={{ width: "5%" }} />
-          <col style={{ width: "35%" }} />
-          <col style={{ width: "35%" }} />
+          <col style={{ width: "9%" }} />
+          <col style={{ width: "9%" }} />
+          <col style={{ width: "33%" }} />
+          <col style={{ width: "34%" }} />
           <col style={{ width: "15%" }} />
         </colgroup>
         <thead>
@@ -845,7 +867,7 @@ export default function DangaLookup() {
           </tr>
         </thead>
         <tbody>
-          {dayRows.map((d) => (
+          {sheetRows.map((d, idx) => (
             <tr key={d.id}>
               <td>
                 <FlagLines d={d} />
@@ -856,7 +878,11 @@ export default function DangaLookup() {
                   <div key={it.id || i}>{itemLabel(it)}</div>
                 ))}
               </td>
-              <td className="left">{d.address}</td>
+              {addrSpans[idx] > 0 && (
+                <td className="left" rowSpan={addrSpans[idx]}>
+                  {d.address}
+                </td>
+              )}
               <td className="time-cell">
                 <div>
                   <span className={d.timePeriod === "AM" ? "tp-on" : "tp-off"}>AM</span>
@@ -948,139 +974,7 @@ export default function DangaLookup() {
         </div>
       )}
 
-      {/* 카드 1: 상품 선택 */}
-      <div className="mt-4 bg-white border border-slate-200">
-        <button
-          onClick={() => setPickerOpen((v) => !v)}
-          aria-expanded={pickerOpen}
-          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left"
-        >
-          <span className="flex items-center gap-2 text-sm font-semibold">
-            <Plus size={16} />
-            {pickTitle}
-          </span>
-          {pickerOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
-        {pickerOpen && (
-          <div className="px-4 pb-4 pt-3 border-t border-slate-100">
-            <p className="text-xs text-slate-500 mb-2">
-              상품명 일부를 검색하고 단가를 누르면 {deliveryDate} 배송 건이 추가돼요. 단가가 두 가지로 보이면 수수료{" "}
-              {feeRate}% 제외 단가와 적용단가를 비교해서 하나를 골라요. 선택한 금액이 정산 페이지의 상품 단가로 들어가요.
-              (수수료율은 단가 조회 탭에서 바꿀 수 있어요)
-            </p>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                value={pickQuery}
-                onChange={(e) => {
-                  setPickQuery(e.target.value);
-                  setPickLimit(40);
-                }}
-                placeholder="예: 이즈 카이"
-                className="w-full border-2 border-slate-900 pl-9 pr-3 py-2 text-base focus:outline-none focus:border-amber-500"
-              />
-            </div>
-            {pickTarget && (
-              <div className="mt-2 flex items-center gap-2 text-xs">
-                <span className="text-amber-700">
-                  {pickTarget.itemId ? "선택한 상품을 바꾸는 중이에요." : "선택한 배송지에 상품을 추가하는 중이에요."}
-                </span>
-                <button onClick={() => setPickTarget(null)} className="underline text-slate-500">
-                  취소
-                </button>
-              </div>
-            )}
-            {pickQuery.trim() &&
-              (pickGroups.length === 0 ? (
-                <p className="text-sm text-slate-500 mt-3">일치하는 상품이 없어요.</p>
-              ) : (
-                <>
-                  {pickPartial && (
-                    <p className="mt-3 text-xs text-amber-700">
-                      검색어를 모두 포함한 상품이 없어서, 일부만 일치하는 상품을 보여줘요.
-                    </p>
-                  )}
-                  <div className="mt-3 border border-slate-200 divide-y divide-slate-200 max-h-80 overflow-y-auto">
-                    {pickGroups.map((g) => (
-                      <div key={g.name} className="px-3 py-2">
-                        <div className="text-sm leading-snug mb-1">
-                          <Highlighted text={g.name} tokens={pickTokens} />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {g.reasonGroups.map((rg) => {
-                            const cur = rg.current;
-                            const hasNet = hasNum(cur.price) && cur.price > 0;
-                            const hasApp = hasNum(cur.applied);
-                            const netVal = hasNet ? netOf(cur.price, feeRate) : 0;
-                            const diff = hasNet && hasApp ? cur.applied - netVal : 0;
-                            return (
-                              <div
-                                key={rg.reason}
-                                className="flex flex-wrap items-center gap-2 border border-slate-200 bg-slate-50 pl-2 pr-2 py-1"
-                              >
-                                <span
-                                  className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(rg.reason)}`}
-                                >
-                                  {rg.reason}
-                                </span>
-                                {hasNet && (
-                                  <button
-                                    onClick={() => pickProduct(cur, "net")}
-                                    title="수수료 제외 단가로 선택"
-                                    className="flex flex-col items-end leading-tight border border-blue-200 bg-white hover:bg-blue-50 px-2 py-0.5"
-                                  >
-                                    <span className="text-xs text-slate-400">수수료 {feeRate}% 제외</span>
-                                    <span className="font-mono text-blue-700 font-semibold text-sm">
-                                      {formatPrice(netVal)}
-                                    </span>
-                                  </button>
-                                )}
-                                {hasApp && (
-                                  <button
-                                    onClick={() => pickProduct(cur, "applied")}
-                                    title="적용단가로 선택"
-                                    className="flex flex-col items-end leading-tight border border-purple-200 bg-white hover:bg-purple-50 px-2 py-0.5"
-                                  >
-                                    <span className="text-xs text-slate-400">적용단가</span>
-                                    <span className="font-mono text-purple-700 font-semibold text-sm">
-                                      {formatPrice(cur.applied)}
-                                    </span>
-                                  </button>
-                                )}
-                                {hasNet && hasApp && diff !== 0 && (
-                                  <span className="text-xs text-slate-400">
-                                    적용단가가 {formatPrice(Math.abs(diff))} {diff > 0 ? "높아요" : "낮아요"}
-                                  </span>
-                                )}
-                                {!hasNet && !hasApp && <span className="text-xs text-slate-400">단가 없음</span>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                    <span>
-                      단가 조회의 전체 상품에서 검색해요 · 결과 {pickAllGroups.length}개 중 {pickGroups.length}개 표시
-                    </span>
-                    {pickAllGroups.length > pickGroups.length && (
-                      <button
-                        onClick={() => setPickLimit((n) => n + 40)}
-                        className="underline font-semibold text-slate-700"
-                      >
-                        더 보기 (+40)
-                      </button>
-                    )}
-                  </div>
-                </>
-              ))}
-          </div>
-        )}
-      </div>
-
-      {/* 카드 2: 배송 내역 */}
+      {/* 배송 내역 */}
       <div className="mt-4 bg-white border border-slate-200">
         <div className="flex items-center gap-3 px-4 py-3">
           <button
@@ -1112,7 +1006,7 @@ export default function DangaLookup() {
           <div className="border-t border-slate-100 bg-slate-50 p-3 space-y-2">
             {dayRows.length === 0 ? (
               <p className="text-sm text-slate-400 py-4 text-center">
-                {deliveryDate}에 등록된 배송 건이 없어요. 위에서 상품을 검색해 추가해주세요.
+                {deliveryDate}에 등록된 배송 건이 없어요. 아래 "상품 선택해서 배송 건 추가"에서 상품을 검색해 추가해주세요.
               </p>
             ) : (
               dayRows.map((d, idx) => {
@@ -1347,6 +1241,138 @@ export default function DangaLookup() {
                 );
               })
             )}
+          </div>
+        )}
+      </div>
+
+      {/* 상품 선택해서 배송 건 추가 (배송 내역 아래) */}
+      <div id="delivery-picker" className="mt-4 bg-white border border-slate-200">
+        <button
+          onClick={() => setPickerOpen((v) => !v)}
+          aria-expanded={pickerOpen}
+          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <Plus size={16} />
+            {pickTitle}
+          </span>
+          {pickerOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+        {pickerOpen && (
+          <div className="px-4 pb-4 pt-3 border-t border-slate-100">
+            <p className="text-xs text-slate-500 mb-2">
+              상품명 일부를 검색하고 단가를 누르면 {deliveryDate} 배송 건이 추가돼요. 단가가 두 가지로 보이면 수수료{" "}
+              {feeRate}% 제외 단가와 적용단가를 비교해서 하나를 골라요. 선택한 금액이 정산 페이지의 상품 단가로 들어가요.
+              (수수료율은 단가 조회 탭에서 바꿀 수 있어요)
+            </p>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                value={pickQuery}
+                onChange={(e) => {
+                  setPickQuery(e.target.value);
+                  setPickLimit(40);
+                }}
+                placeholder="예: 이즈 카이"
+                className="w-full border-2 border-slate-900 pl-9 pr-3 py-2 text-base focus:outline-none focus:border-amber-500"
+              />
+            </div>
+            {pickTarget && (
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <span className="text-amber-700">
+                  {pickTarget.itemId ? "선택한 상품을 바꾸는 중이에요." : "선택한 배송지에 상품을 추가하는 중이에요."}
+                </span>
+                <button onClick={() => setPickTarget(null)} className="underline text-slate-500">
+                  취소
+                </button>
+              </div>
+            )}
+            {pickQuery.trim() &&
+              (pickGroups.length === 0 ? (
+                <p className="text-sm text-slate-500 mt-3">일치하는 상품이 없어요.</p>
+              ) : (
+                <>
+                  {pickPartial && (
+                    <p className="mt-3 text-xs text-amber-700">
+                      검색어를 모두 포함한 상품이 없어서, 일부만 일치하는 상품을 보여줘요.
+                    </p>
+                  )}
+                  <div className="mt-3 border border-slate-200 divide-y divide-slate-200 max-h-80 overflow-y-auto">
+                    {pickGroups.map((g) => (
+                      <div key={g.name} className="px-3 py-2">
+                        <div className="text-sm leading-snug mb-1">
+                          <Highlighted text={g.name} tokens={pickTokens} />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {g.reasonGroups.map((rg) => {
+                            const cur = rg.current;
+                            const hasNet = hasNum(cur.price) && cur.price > 0;
+                            const hasApp = hasNum(cur.applied);
+                            const netVal = hasNet ? netOf(cur.price, feeRate) : 0;
+                            const diff = hasNet && hasApp ? cur.applied - netVal : 0;
+                            return (
+                              <div
+                                key={rg.reason}
+                                className="flex flex-wrap items-center gap-2 border border-slate-200 bg-slate-50 pl-2 pr-2 py-1"
+                              >
+                                <span
+                                  className={`text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(rg.reason)}`}
+                                >
+                                  {rg.reason}
+                                </span>
+                                {hasNet && (
+                                  <button
+                                    onClick={() => pickProduct(cur, "net")}
+                                    title="수수료 제외 단가로 선택"
+                                    className="flex flex-col items-end leading-tight border border-blue-200 bg-white hover:bg-blue-50 px-2 py-0.5"
+                                  >
+                                    <span className="text-xs text-slate-400">수수료 {feeRate}% 제외</span>
+                                    <span className="font-mono text-blue-700 font-semibold text-sm">
+                                      {formatPrice(netVal)}
+                                    </span>
+                                  </button>
+                                )}
+                                {hasApp && (
+                                  <button
+                                    onClick={() => pickProduct(cur, "applied")}
+                                    title="적용단가로 선택"
+                                    className="flex flex-col items-end leading-tight border border-purple-200 bg-white hover:bg-purple-50 px-2 py-0.5"
+                                  >
+                                    <span className="text-xs text-slate-400">적용단가</span>
+                                    <span className="font-mono text-purple-700 font-semibold text-sm">
+                                      {formatPrice(cur.applied)}
+                                    </span>
+                                  </button>
+                                )}
+                                {hasNet && hasApp && diff !== 0 && (
+                                  <span className="text-xs text-slate-400">
+                                    적용단가가 {formatPrice(Math.abs(diff))} {diff > 0 ? "높아요" : "낮아요"}
+                                  </span>
+                                )}
+                                {!hasNet && !hasApp && <span className="text-xs text-slate-400">단가 없음</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                    <span>
+                      단가 조회의 전체 상품에서 검색해요 · 결과 {pickAllGroups.length}개 중 {pickGroups.length}개 표시
+                    </span>
+                    {pickAllGroups.length > pickGroups.length && (
+                      <button
+                        onClick={() => setPickLimit((n) => n + 40)}
+                        className="underline font-semibold text-slate-700"
+                      >
+                        더 보기 (+40)
+                      </button>
+                    )}
+                  </div>
+                </>
+              ))}
           </div>
         )}
       </div>

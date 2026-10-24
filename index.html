@@ -14529,12 +14529,15 @@ function DangaLookup() {
   function openPickerFor(target) {
     setPickTarget(target);
     setPickerOpen(true);
-    try {
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
-    } catch (e) {}
+    setTimeout(() => {
+      try {
+        const el = document.getElementById("delivery-picker");
+        if (el && el.scrollIntoView) el.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      } catch (e) {}
+    }, 60);
   }
   function handleDeleteDelivery(id) {
     persistDeliveries(deliveries.filter(d => d.id !== id));
@@ -14628,31 +14631,50 @@ function DangaLookup() {
   }, [dayRows]);
   const inputCls = "w-full border border-slate-300 px-2 py-1.5 text-base focus:outline-none focus:border-slate-900";
   const moneyCls = inputCls + " font-mono text-right";
+  const sheetRows = dayRows.map((d, i) => ({
+    d,
+    i
+  })).sort((x, y) => {
+    const xa = normalizeName(x.d.address);
+    const ya = normalizeName(y.d.address);
+    if (!xa && !ya) return x.i - y.i;
+    if (!xa) return 1;
+    if (!ya) return -1;
+    return xa.localeCompare(ya) || x.i - y.i;
+  }).map(x => x.d);
+  const addrSpans = sheetRows.map((d, i) => {
+    const a = normalizeName(d.address);
+    if (!a) return 1;
+    if (i > 0 && normalizeName(sheetRows[i - 1].address) === a) return 0;
+    let n = 1;
+    while (i + n < sheetRows.length && normalizeName(sheetRows[i + n].address) === a) n++;
+    return n;
+  });
   const deliverySheet = /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
     className: "delivery-title"
   }, "배송 리스트 · ", deliveryDate), /*#__PURE__*/React.createElement("table", {
     className: "print-table delivery-table"
   }, /*#__PURE__*/React.createElement("colgroup", null, /*#__PURE__*/React.createElement("col", {
     style: {
-      width: "10%"
+      width: "9%"
     }
   }), /*#__PURE__*/React.createElement("col", {
     style: {
-      width: "5%"
+      width: "9%"
     }
   }), /*#__PURE__*/React.createElement("col", {
     style: {
-      width: "35%"
+      width: "33%"
     }
   }), /*#__PURE__*/React.createElement("col", {
     style: {
-      width: "35%"
+      width: "34%"
     }
   }), /*#__PURE__*/React.createElement("col", {
     style: {
       width: "15%"
     }
-  })), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "구분"), /*#__PURE__*/React.createElement("th", null, "박스"), /*#__PURE__*/React.createElement("th", null, "상품명"), /*#__PURE__*/React.createElement("th", null, "주소"), /*#__PURE__*/React.createElement("th", null, "시간"))), /*#__PURE__*/React.createElement("tbody", null, dayRows.map(d => /*#__PURE__*/React.createElement("tr", {
+  })), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "구분"), /*#__PURE__*/React.createElement("th", null, "박스"), /*#__PURE__*/React.createElement("th", null, "상품명"), /*#__PURE__*/React.createElement("th", null, "주소"), /*#__PURE__*/React.createElement("th", null, "시간"))), /*#__PURE__*/React.createElement("tbody", null, sheetRows.map((d, idx) => /*#__PURE__*/React.createElement("tr", {
     key: d.id
   }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement(FlagLines, {
     d: d
@@ -14660,8 +14682,9 @@ function DangaLookup() {
     className: "left"
   }, itemsOf(d).map((it, i) => /*#__PURE__*/React.createElement("div", {
     key: it.id || i
-  }, itemLabel(it)))), /*#__PURE__*/React.createElement("td", {
-    className: "left"
+  }, itemLabel(it)))), addrSpans[idx] > 0 && /*#__PURE__*/React.createElement("td", {
+    className: "left",
+    rowSpan: addrSpans[idx]
   }, d.address), /*#__PURE__*/React.createElement("td", {
     className: "time-cell"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
@@ -14727,98 +14750,6 @@ function DangaLookup() {
     }
   }, deliverySheet))), /*#__PURE__*/React.createElement("div", {
     className: "mt-4 bg-white border border-slate-200"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setPickerOpen(v => !v),
-    "aria-expanded": pickerOpen,
-    className: "w-full flex items-center justify-between gap-2 px-4 py-3 text-left"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "flex items-center gap-2 text-sm font-semibold"
-  }, /*#__PURE__*/React.createElement(Plus, {
-    size: 16
-  }), pickTitle), pickerOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
-    size: 16
-  }) : /*#__PURE__*/React.createElement(ChevronDown, {
-    size: 16
-  })), pickerOpen && /*#__PURE__*/React.createElement("div", {
-    className: "px-4 pb-4 pt-3 border-t border-slate-100"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-500 mb-2"
-  }, "상품명 일부를 검색하고 단가를 누르면 ", deliveryDate, " 배송 건이 추가돼요. 단가가 두 가지로 보이면 수수료", " ", feeRate, "% 제외 단가와 적용단가를 비교해서 하나를 골라요. 선택한 금액이 정산 페이지의 상품 단가로 들어가요. (수수료율은 단가 조회 탭에서 바꿀 수 있어요)"), /*#__PURE__*/React.createElement("div", {
-    className: "relative"
-  }, /*#__PURE__*/React.createElement(Search, {
-    className: "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400",
-    size: 16
-  }), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    value: pickQuery,
-    onChange: e => {
-      setPickQuery(e.target.value);
-      setPickLimit(40);
-    },
-    placeholder: "예: 이즈 카이",
-    className: "w-full border-2 border-slate-900 pl-9 pr-3 py-2 text-base focus:outline-none focus:border-amber-500"
-  })), pickTarget && /*#__PURE__*/React.createElement("div", {
-    className: "mt-2 flex items-center gap-2 text-xs"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "text-amber-700"
-  }, pickTarget.itemId ? "선택한 상품을 바꾸는 중이에요." : "선택한 배송지에 상품을 추가하는 중이에요."), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setPickTarget(null),
-    className: "underline text-slate-500"
-  }, "취소")), pickQuery.trim() && (pickGroups.length === 0 ? /*#__PURE__*/React.createElement("p", {
-    className: "text-sm text-slate-500 mt-3"
-  }, "일치하는 상품이 없어요.") : /*#__PURE__*/React.createElement(React.Fragment, null, pickPartial && /*#__PURE__*/React.createElement("p", {
-    className: "mt-3 text-xs text-amber-700"
-  }, "검색어를 모두 포함한 상품이 없어서, 일부만 일치하는 상품을 보여줘요."), /*#__PURE__*/React.createElement("div", {
-    className: "mt-3 border border-slate-200 divide-y divide-slate-200 max-h-80 overflow-y-auto"
-  }, pickGroups.map(g => /*#__PURE__*/React.createElement("div", {
-    key: g.name,
-    className: "px-3 py-2"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "text-sm leading-snug mb-1"
-  }, /*#__PURE__*/React.createElement(Highlighted, {
-    text: g.name,
-    tokens: pickTokens
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap gap-2"
-  }, g.reasonGroups.map(rg => {
-    const cur = rg.current;
-    const hasNet = hasNum(cur.price) && cur.price > 0;
-    const hasApp = hasNum(cur.applied);
-    const netVal = hasNet ? netOf(cur.price, feeRate) : 0;
-    const diff = hasNet && hasApp ? cur.applied - netVal : 0;
-    return /*#__PURE__*/React.createElement("div", {
-      key: rg.reason,
-      className: "flex flex-wrap items-center gap-2 border border-slate-200 bg-slate-50 pl-2 pr-2 py-1"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: `text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(rg.reason)}`
-    }, rg.reason), hasNet && /*#__PURE__*/React.createElement("button", {
-      onClick: () => pickProduct(cur, "net"),
-      title: "수수료 제외 단가로 선택",
-      className: "flex flex-col items-end leading-tight border border-blue-200 bg-white hover:bg-blue-50 px-2 py-0.5"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "text-xs text-slate-400"
-    }, "수수료 ", feeRate, "% 제외"), /*#__PURE__*/React.createElement("span", {
-      className: "font-mono text-blue-700 font-semibold text-sm"
-    }, formatPrice(netVal))), hasApp && /*#__PURE__*/React.createElement("button", {
-      onClick: () => pickProduct(cur, "applied"),
-      title: "적용단가로 선택",
-      className: "flex flex-col items-end leading-tight border border-purple-200 bg-white hover:bg-purple-50 px-2 py-0.5"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "text-xs text-slate-400"
-    }, "적용단가"), /*#__PURE__*/React.createElement("span", {
-      className: "font-mono text-purple-700 font-semibold text-sm"
-    }, formatPrice(cur.applied))), hasNet && hasApp && diff !== 0 && /*#__PURE__*/React.createElement("span", {
-      className: "text-xs text-slate-400"
-    }, "적용단가가 ", formatPrice(Math.abs(diff)), " ", diff > 0 ? "높아요" : "낮아요"), !hasNet && !hasApp && /*#__PURE__*/React.createElement("span", {
-      className: "text-xs text-slate-400"
-    }, "단가 없음"));
-  }))))), /*#__PURE__*/React.createElement("div", {
-    className: "mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500"
-  }, /*#__PURE__*/React.createElement("span", null, "단가 조회의 전체 상품에서 검색해요 · 결과 ", pickAllGroups.length, "개 중 ", pickGroups.length, "개 표시"), pickAllGroups.length > pickGroups.length && /*#__PURE__*/React.createElement("button", {
-    onClick: () => setPickLimit(n => n + 40),
-    className: "underline font-semibold text-slate-700"
-  }, "더 보기 (+40)")))))), /*#__PURE__*/React.createElement("div", {
-    className: "mt-4 bg-white border border-slate-200"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-3 px-4 py-3"
   }, /*#__PURE__*/React.createElement("button", {
@@ -14841,7 +14772,7 @@ function DangaLookup() {
     className: "border-t border-slate-100 bg-slate-50 p-3 space-y-2"
   }, dayRows.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-400 py-4 text-center"
-  }, deliveryDate, "에 등록된 배송 건이 없어요. 위에서 상품을 검색해 추가해주세요.") : dayRows.map((d, idx) => {
+  }, deliveryDate, "에 등록된 배송 건이 없어요. 아래 \"상품 선택해서 배송 건 추가\"에서 상품을 검색해 추가해주세요.") : dayRows.map((d, idx) => {
     const open = openRows.has(d.id);
     const its = itemsOf(d);
     const flags = d.flags || {};
@@ -15028,7 +14959,100 @@ function DangaLookup() {
     }, /*#__PURE__*/React.createElement(X, {
       size: 14
     }))))))));
-  }))));
+  }))), /*#__PURE__*/React.createElement("div", {
+    id: "delivery-picker",
+    className: "mt-4 bg-white border border-slate-200"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPickerOpen(v => !v),
+    "aria-expanded": pickerOpen,
+    className: "w-full flex items-center justify-between gap-2 px-4 py-3 text-left"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "flex items-center gap-2 text-sm font-semibold"
+  }, /*#__PURE__*/React.createElement(Plus, {
+    size: 16
+  }), pickTitle), pickerOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
+    size: 16
+  }) : /*#__PURE__*/React.createElement(ChevronDown, {
+    size: 16
+  })), pickerOpen && /*#__PURE__*/React.createElement("div", {
+    className: "px-4 pb-4 pt-3 border-t border-slate-100"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-500 mb-2"
+  }, "상품명 일부를 검색하고 단가를 누르면 ", deliveryDate, " 배송 건이 추가돼요. 단가가 두 가지로 보이면 수수료", " ", feeRate, "% 제외 단가와 적용단가를 비교해서 하나를 골라요. 선택한 금액이 정산 페이지의 상품 단가로 들어가요. (수수료율은 단가 조회 탭에서 바꿀 수 있어요)"), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement(Search, {
+    className: "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400",
+    size: 16
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: pickQuery,
+    onChange: e => {
+      setPickQuery(e.target.value);
+      setPickLimit(40);
+    },
+    placeholder: "예: 이즈 카이",
+    className: "w-full border-2 border-slate-900 pl-9 pr-3 py-2 text-base focus:outline-none focus:border-amber-500"
+  })), pickTarget && /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 flex items-center gap-2 text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-amber-700"
+  }, pickTarget.itemId ? "선택한 상품을 바꾸는 중이에요." : "선택한 배송지에 상품을 추가하는 중이에요."), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPickTarget(null),
+    className: "underline text-slate-500"
+  }, "취소")), pickQuery.trim() && (pickGroups.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-slate-500 mt-3"
+  }, "일치하는 상품이 없어요.") : /*#__PURE__*/React.createElement(React.Fragment, null, pickPartial && /*#__PURE__*/React.createElement("p", {
+    className: "mt-3 text-xs text-amber-700"
+  }, "검색어를 모두 포함한 상품이 없어서, 일부만 일치하는 상품을 보여줘요."), /*#__PURE__*/React.createElement("div", {
+    className: "mt-3 border border-slate-200 divide-y divide-slate-200 max-h-80 overflow-y-auto"
+  }, pickGroups.map(g => /*#__PURE__*/React.createElement("div", {
+    key: g.name,
+    className: "px-3 py-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-sm leading-snug mb-1"
+  }, /*#__PURE__*/React.createElement(Highlighted, {
+    text: g.name,
+    tokens: pickTokens
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2"
+  }, g.reasonGroups.map(rg => {
+    const cur = rg.current;
+    const hasNet = hasNum(cur.price) && cur.price > 0;
+    const hasApp = hasNum(cur.applied);
+    const netVal = hasNet ? netOf(cur.price, feeRate) : 0;
+    const diff = hasNet && hasApp ? cur.applied - netVal : 0;
+    return /*#__PURE__*/React.createElement("div", {
+      key: rg.reason,
+      className: "flex flex-wrap items-center gap-2 border border-slate-200 bg-slate-50 pl-2 pr-2 py-1"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: `text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(rg.reason)}`
+    }, rg.reason), hasNet && /*#__PURE__*/React.createElement("button", {
+      onClick: () => pickProduct(cur, "net"),
+      title: "수수료 제외 단가로 선택",
+      className: "flex flex-col items-end leading-tight border border-blue-200 bg-white hover:bg-blue-50 px-2 py-0.5"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-xs text-slate-400"
+    }, "수수료 ", feeRate, "% 제외"), /*#__PURE__*/React.createElement("span", {
+      className: "font-mono text-blue-700 font-semibold text-sm"
+    }, formatPrice(netVal))), hasApp && /*#__PURE__*/React.createElement("button", {
+      onClick: () => pickProduct(cur, "applied"),
+      title: "적용단가로 선택",
+      className: "flex flex-col items-end leading-tight border border-purple-200 bg-white hover:bg-purple-50 px-2 py-0.5"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-xs text-slate-400"
+    }, "적용단가"), /*#__PURE__*/React.createElement("span", {
+      className: "font-mono text-purple-700 font-semibold text-sm"
+    }, formatPrice(cur.applied))), hasNet && hasApp && diff !== 0 && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs text-slate-400"
+    }, "적용단가가 ", formatPrice(Math.abs(diff)), " ", diff > 0 ? "높아요" : "낮아요"), !hasNet && !hasApp && /*#__PURE__*/React.createElement("span", {
+      className: "text-xs text-slate-400"
+    }, "단가 없음"));
+  }))))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500"
+  }, /*#__PURE__*/React.createElement("span", null, "단가 조회의 전체 상품에서 검색해요 · 결과 ", pickAllGroups.length, "개 중 ", pickGroups.length, "개 표시"), pickAllGroups.length > pickGroups.length && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setPickLimit(n => n + 40),
+    className: "underline font-semibold text-slate-700"
+  }, "더 보기 (+40)")))))));
   const settleSel = useMemo(() => dayRows.filter(isSettleSel), [dayRows]);
   const settleSummary = useMemo(() => {
     const t = {
