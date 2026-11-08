@@ -6,6 +6,7 @@ const PRODUCTS_KEY = "products";
 const REASONS_KEY = "custom_reasons";
 const FEE_KEY = "fee_rate";
 const DELIVERIES_KEY = "deliveries";
+// window.storage is provided by index.html and syncs these keys to Supabase with a browser fallback.
 const STATUS_LIST = ["완료", "연기", "취소"];
 const STATUS_STYLE = {
   완료: "bg-emerald-100 text-emerald-700",
@@ -30,6 +31,15 @@ table.print-table.delivery-table td.left, table.print-table.delivery-table td.ti
 table.print-table.settle-table th, table.print-table.settle-table td { text-align: center; vertical-align: middle; }
 table.print-table.settle-table td.left { text-align: left; }
 table.print-table.settle-table td.num { text-align: right; }
+html { color-scheme: light; }
+body { margin: 0; background: #f8fafc; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.min-h-screen { background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); }
+.min-h-screen .no-print button { border-radius: 9px; transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.min-h-screen .no-print button:hover:not(:disabled) { transform: translateY(-1px); }
+.min-h-screen .no-print input:not([type="checkbox"]):not([type="radio"]), .min-h-screen .no-print select { border-radius: 8px; }
+.min-h-screen .no-print input:focus, .min-h-screen .no-print select:focus { box-shadow: 0 0 0 3px rgba(99, 102, 241, .15); }
+.min-h-screen .no-print section.bg-white { border-radius: 16px; box-shadow: 0 8px 24px rgba(15, 23, 42, .06); }
+.min-h-screen .no-print .bg-white.border, .min-h-screen .no-print .bg-white.border-2 { border-radius: 12px; }
 @media print {
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { size: A4 landscape; margin: 8mm; }
@@ -102,6 +112,9 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
+function dateInputStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 const DEFAULT_FEE_RATE = 15;
 function netOf(price, rate) {
   const r = Number(rate);
@@ -144,7 +157,7 @@ function buildGroups(list, asOf) {
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
-const SHEET_HEAD = ["구분", "상태", "배송일", "송장번호", "박스", "상품명", "주소", "메모", "설치비", "양중비", "내림비", "기타비용", "합계"];
+const SHEET_HEAD = ["구분", "상태", "배송일", "송장번호", "박스", "상품명", "수량", "주소", "메모", "설치비", "양중비", "내림비", "기타비용", "합계"];
 const FLAG_LIST = [
   { key: "direct", label: "직접설치", color: "#dc2626", badge: "bg-red-100 text-red-700" },
   { key: "reship", label: "재출고", color: "#2563eb", badge: "bg-blue-100 text-blue-700" },
@@ -180,21 +193,23 @@ function optNum(v) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 function itemsOf(d) {
-  if (Array.isArray(d.items) && d.items.length) return d.items;
+  if (Array.isArray(d.items) && d.items.length) {
+    return d.items.map((it) => ({ ...it, qty: Math.max(1, Math.floor(Number(it.qty) || 1)) }));
+  }
   if (d.productName || d.install) {
-    return [{ id: "legacy", name: d.productName || "", reason: d.reason || "기본", price: d.install || 0 }];
+    return [{ id: "legacy", name: d.productName || "", reason: d.reason || "기본", price: d.install || 0, qty: 1 }];
   }
   return [];
 }
 function sumItems(items) {
-  return items.reduce((sum, it) => sum + (Number(it.price) || 0), 0);
+  return items.reduce((sum, it) => sum + (Number(it.price) || 0) * Math.max(1, Number(it.qty) || 1), 0);
 }
 function itemLabel(it) {
   return `${it.name || ""}${it.reason && it.reason !== "기본" ? ` (${it.reason})` : ""}`;
 }
 function productLabel(d) {
   const its = itemsOf(d);
-  return its.length ? its.map(itemLabel).join(" + ") : d.productName || "";
+  return its.length ? its.map((it) => `${itemLabel(it)}${Number(it.qty) > 1 ? ` × ${it.qty}` : ""}`).join(" + ") : d.productName || "";
 }
 function applyItems(d, items) {
   const reasons = [...new Set(items.map((it) => it.reason || "기본"))];
@@ -221,7 +236,7 @@ function setNumFmt(ws, cols, fromRow, toRow) {
 }
 function buildSettleSheet(rows, title) {
   const aoa = [[title], SHEET_HEAD];
-  const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 12 } }];
+  const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }];
   const groups = [];
   const sums = [0, 0, 0, 0, 0];
   rows.forEach((d) => {
@@ -229,7 +244,8 @@ function buildSettleSheet(rows, title) {
     const lines = its.length ? its : [null];
     const first = aoa.length + 1;
     lines.forEach((it, k) => {
-      const inst = it ? Number(it.price) || 0 : d.install || 0;
+      const quantity = it ? Math.max(1, Number(it.qty) || 1) : 1;
+      const inst = it ? (Number(it.price) || 0) * quantity : d.install || 0;
       aoa.push([
         k === 0 ? flagsText(d) : null,
         k === 0 ? d.status || "" : null,
@@ -237,6 +253,7 @@ function buildSettleSheet(rows, title) {
         k === 0 ? d.invoice || "" : null,
         k === 0 ? d.box || "" : null,
         it ? itemLabel(it) : "",
+        quantity,
         k === 0 ? d.address || "" : null,
         k === 0 ? d.memo || "" : null,
         inst,
@@ -252,32 +269,32 @@ function buildSettleSheet(rows, title) {
     sums[3] += d.etc || 0;
     sums[4] += deliveryTotal(d);
     groups.push({ d, first, last: first + lines.length - 1 });
-    if (lines.length > 1) merges.push({ s: { r: first - 1, c: 6 }, e: { r: first + lines.length - 2, c: 6 } });
+    if (lines.length > 1) merges.push({ s: { r: first - 1, c: 7 }, e: { r: first + lines.length - 2, c: 7 } });
   });
   const firstRow = 3;
   const lastRow = aoa.length;
   const foot = aoa.length + 1;
-  aoa.push([`선택 ${rows.length}건 합계`, null, null, null, null, null, null, null, ...sums]);
+  aoa.push([`선택 ${rows.length}건 합계`, null, null, null, null, null, null, null, null, ...sums]);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   groups.forEach((g) => {
-    ws["M" + g.first] = {
+    ws["N" + g.first] = {
       t: "n",
       f:
         g.last === g.first
-          ? `SUM(I${g.first}:L${g.first})`
-          : `SUM(I${g.first}:I${g.last})+SUM(J${g.first}:L${g.first})`,
+          ? `SUM(J${g.first}:M${g.first})`
+          : `SUM(J${g.first}:J${g.last})+SUM(K${g.first}:M${g.first})`,
       v: deliveryTotal(g.d),
     };
   });
-  ["I", "J", "K", "L", "M"].forEach((c, k) => {
+  ["J", "K", "L", "M", "N"].forEach((c, k) => {
     ws[c + foot] = lastRow >= firstRow
       ? { t: "n", f: `SUM(${c}${firstRow}:${c}${lastRow})`, v: sums[k] }
       : { t: "n", v: 0 };
   });
-  setNumFmt(ws, ["I", "J", "K", "L", "M"], firstRow, foot);
-  merges.push({ s: { r: foot - 1, c: 0 }, e: { r: foot - 1, c: 7 } });
+  setNumFmt(ws, ["J", "K", "L", "M", "N"], firstRow, foot);
+  merges.push({ s: { r: foot - 1, c: 0 }, e: { r: foot - 1, c: 8 } });
   ws["!merges"] = merges;
-  ws["!cols"] = [6, 6, 11, 14, 8, 42, 36, 20, 10, 10, 10, 10, 12].map((w) => ({ wch: w }));
+  ws["!cols"] = [6, 6, 11, 14, 8, 42, 8, 36, 20, 10, 10, 10, 10, 12].map((w) => ({ wch: w }));
   return ws;
 }
 function Field({ label, className = "", children }) {
@@ -286,6 +303,16 @@ function Field({ label, className = "", children }) {
       <span className="block text-xs text-slate-500 mb-0.5">{label}</span>
       {children}
     </label>
+  );
+}
+function ExcelFileIcon({ size = 16, ...props }) {
+  return (
+    <Icon size={size} {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="m8 12 4 6m0-6-4 6" />
+      <path d="M14 13h3m-3 3h3" />
+    </Icon>
   );
 }
 function excelCellToDateStr(raw) {
@@ -316,6 +343,7 @@ export default function DangaLookup() {
   const [customReasons, setCustomReasons] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(() => window.storage?.syncStatus || "connecting");
   const [query, setQuery] = useState("");
   const [manageOpen, setManageOpen] = useState(false);
 
@@ -360,6 +388,9 @@ export default function DangaLookup() {
   const [settleListOpen, setSettleListOpen] = useState(true);
   const [settleOpenRows, setSettleOpenRows] = useState(() => new Set());
   const [expandedSettleDate, setExpandedSettleDate] = useState(null);
+  const [recordsMode, setRecordsMode] = useState("month");
+  const [recordsDate, setRecordsDate] = useState(() => deliveryDate);
+  useEffect(() => { setRecordsDate(deliveryDate); }, [deliveryDate]);
   const [exportMsg, setExportMsg] = useState("");
   const [showSettlePreview, setShowSettlePreview] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(true);
@@ -394,6 +425,13 @@ export default function DangaLookup() {
       return lowerTokens.every((t) => lname.includes(t));
     });
   }, [sortedProducts, manageTokens]);
+
+  useEffect(() => {
+    const onStorageStatus = (event) => setSyncStatus(event.detail?.status || window.storage?.syncStatus || "local");
+    window.addEventListener("danga-storage-status", onStorageStatus);
+    if (window.storage?.syncStatus) setSyncStatus(window.storage.syncStatus);
+    return () => window.removeEventListener("danga-storage-status", onStorageStatus);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -644,9 +682,11 @@ export default function DangaLookup() {
   async function persistDeliveries(next) {
     setDeliveries(next);
     try {
-      await window.storage.set(DELIVERIES_KEY, JSON.stringify(next), false);
+      const result = await window.storage.set(DELIVERIES_KEY, JSON.stringify(next), false);
+      setSaveError(!result);
     } catch (e) {
       console.error(e);
+      setSaveError(true);
     }
   }
   function updateDelivery(id, patch) {
@@ -697,6 +737,7 @@ export default function DangaLookup() {
       id: uid(),
       name: normalizeName(entry.name),
       reason: (entry.reason || "기본").trim() || "기본",
+      qty: 1,
       price: useApplied ? entry.applied : netOf(entry.price, feeRate),
       priceMode: useApplied ? "applied" : "net",
       basePrice: hasNum(entry.price) ? entry.price : null,
@@ -851,10 +892,10 @@ export default function DangaLookup() {
       <h2 className="delivery-title">배송 리스트 · {deliveryDate}</h2>
       <table className="print-table delivery-table">
         <colgroup>
-          <col style={{ width: "9%" }} />
-          <col style={{ width: "9%" }} />
-          <col style={{ width: "33%" }} />
-          <col style={{ width: "34%" }} />
+          <col style={{ width: "5%" }} />
+          <col style={{ width: "5%" }} />
+          <col style={{ width: "37%" }} />
+          <col style={{ width: "38%" }} />
           <col style={{ width: "15%" }} />
         </colgroup>
         <thead>
@@ -1057,19 +1098,11 @@ export default function DangaLookup() {
                           </span>
                         </span>
                       </button>
-                      <select
-                        value={d.status}
-                        onChange={(e) => updateDelivery(d.id, { status: e.target.value })}
-                        className={`text-base font-semibold px-2 py-1 border border-slate-300 shrink-0 ${
-                          STATUS_STYLE[d.status] || ""
-                        }`}
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[d.status] || "bg-slate-100 text-slate-700"}`}
                       >
-                        {STATUS_LIST.map((st) => (
-                          <option key={st} value={st}>
-                            {st}
-                          </option>
-                        ))}
-                      </select>
+                        {d.status}
+                      </span>
                     </div>
 
                     {open && (
@@ -1210,8 +1243,21 @@ export default function DangaLookup() {
                                   title="상품명 (직접 수정할 수 있어요)"
                                   className="flex-1 basis-48 min-w-0 border border-slate-300 px-2 py-1.5 text-base focus:outline-none focus:border-slate-900"
                                 />
+                                <label className="flex items-center gap-1 text-xs text-slate-500 whitespace-nowrap">
+                                  수량
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    inputMode="numeric"
+                                    aria-label="상품 수량"
+                                    value={it.qty || 1}
+                                    onChange={(e) => updateItem(d.id, it.id, { qty: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                                    className="w-16 border border-slate-300 px-1.5 py-1 text-base text-center focus:outline-none focus:border-slate-900"
+                                  />
+                                </label>
                                 <span className="text-xs text-slate-500 whitespace-nowrap">
-                                  {formatPrice(it.price)}
+                                  {formatPrice(it.price)} / 개 · 소계 {formatPrice((Number(it.price) || 0) * (it.qty || 1))}
                                   {MODE_LABEL[it.priceMode] ? (
                                     <span className="text-slate-400"> ({MODE_LABEL[it.priceMode]})</span>
                                   ) : null}
@@ -1261,9 +1307,7 @@ export default function DangaLookup() {
         {pickerOpen && (
           <div className="px-4 pb-4 pt-3 border-t border-slate-100">
             <p className="text-xs text-slate-500 mb-2">
-              상품명 일부를 검색하고 단가를 누르면 {deliveryDate} 배송 건이 추가돼요. 단가가 두 가지로 보이면 수수료{" "}
-              {feeRate}% 제외 단가와 적용단가를 비교해서 하나를 골라요. 선택한 금액이 정산 페이지의 상품 단가로 들어가요.
-              (수수료율은 단가 조회 탭에서 바꿀 수 있어요)
+              상품을 검색하고 수수료 제외 단가 또는 적용단가를 선택하면 {deliveryDate} 배송에 추가돼요. 수수료율은 단가 조회에서 변경할 수 있어요.
             </p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
@@ -1411,6 +1455,29 @@ export default function DangaLookup() {
       .sort((x, y) => (x.date < y.date ? 1 : -1));
   }, [deliveries]);
 
+  const recordsByDate = useMemo(() => new Map(deliveryRecords.map((r) => [r.date, r])), [deliveryRecords]);
+  const recordsYear = Number(recordsDate.slice(0, 4));
+  const recordsMonth = Number(recordsDate.slice(5, 7));
+  const recordsMonthPrefix = recordsDate.slice(0, 7);
+  const recordsYearPrefix = recordsDate.slice(0, 4);
+  const dailyRecord = recordsByDate.get(recordsDate);
+  const monthlyRecords = useMemo(() => deliveryRecords.filter((r) => r.date.startsWith(recordsMonthPrefix)), [deliveryRecords, recordsMonthPrefix]);
+  const yearlyRecords = useMemo(() => deliveryRecords.filter((r) => r.date.startsWith(recordsYearPrefix)), [deliveryRecords, recordsYearPrefix]);
+  const annualMonths = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+    const prefix = `${recordsYearPrefix}-${String(i + 1).padStart(2, "0")}`;
+    const rows = deliveryRecords.filter((r) => r.date.startsWith(prefix));
+    return { month: i + 1, prefix, days: rows.length, count: rows.reduce((sum, r) => sum + r.count, 0), total: rows.reduce((sum, r) => sum + r.total, 0) };
+  }), [deliveryRecords, recordsYearPrefix]);
+  const calendarCells = useMemo(() => {
+    const first = new Date(recordsYear, recordsMonth - 1, 1);
+    const offset = first.getDay();
+    const count = new Date(recordsYear, recordsMonth, 0).getDate();
+    return [...Array(offset).fill(null), ...Array.from({ length: count }, (_, i) => dateInputStr(new Date(recordsYear, recordsMonth - 1, i + 1)))];
+  }, [recordsYear, recordsMonth]);
+  const recordsDayRows = useMemo(() => deliveries.filter((d) => d.date === recordsDate), [deliveries, recordsDate]);
+  const recordsMonthRows = useMemo(() => deliveries.filter((d) => String(d.date || "").startsWith(recordsMonthPrefix)), [deliveries, recordsMonthPrefix]);
+  const recordsYearRows = useMemo(() => deliveries.filter((d) => String(d.date || "").startsWith(recordsYearPrefix)), [deliveries, recordsYearPrefix]);
+
   function toggleSettle(d) {
     updateDelivery(d.id, { settle: !isSettleSel(d) });
   }
@@ -1435,23 +1502,42 @@ export default function DangaLookup() {
       setExportMsg("엑셀 파일을 만들지 못했어요. 배포된 사이트에서 다시 시도해주세요.");
     }
   }
-  function exportSelectedExcel() {
+  function exportDayExcel() {
+    const rows = [...dayRows].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(
-      wb,
-      buildSettleSheet(settleSel, `정산서 · ${deliveryDate} (선택 ${settleSel.length}건)`),
-      "정산서"
-    );
-    downloadWorkbook(wb, `정산서_${deliveryDate}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, `배송 내역 · ${deliveryDate} (전체 ${rows.length}건)`), "배송내역");
+    downloadWorkbook(wb, `배송내역_${deliveryDate}.xlsx`);
   }
   function exportAllExcel() {
-    const rows = deliveries.filter(isSettleSel).sort((x, y) => x.date.localeCompare(y.date));
+    const rows = [...deliveries].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     const title = rows.length
-      ? `정산서 · 전체 (${rows[0].date} ~ ${rows[rows.length - 1].date}, ${rows.length}건)`
-      : "정산서 · 전체";
+      ? `배송 내역 · 전체 (${rows[0].date} ~ ${rows[rows.length - 1].date}, ${rows.length}건)`
+      : "배송 내역 · 전체";
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, title), "정산서");
-    downloadWorkbook(wb, `정산서_전체_${todayStr().replace(/-/g, "")}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, title), "배송내역");
+    downloadWorkbook(wb, `배송내역_전체_${todayStr().replace(/-/g, "")}.xlsx`);
+  }
+
+  function shiftRecordsCursor(delta) {
+    const d = new Date(`${recordsDate}T12:00:00`);
+    if (recordsMode === "day") d.setDate(d.getDate() + delta);
+    else if (recordsMode === "month") { d.setDate(1); d.setMonth(d.getMonth() + delta); }
+    else d.setFullYear(d.getFullYear() + delta);
+    const next = dateInputStr(d);
+    setRecordsDate(next);
+    setDeliveryDate(next);
+  }
+
+  function exportRecordsPeriod(period) {
+    const key = period === "day" ? recordsDate : period === "month" ? recordsMonthPrefix : recordsYearPrefix;
+    const rows = deliveries
+      .filter((d) => period === "day" ? d.date === key : String(d.date || "").startsWith(key))
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    if (!rows.length) return;
+    const title = `배송 내역 · ${period === "day" ? key : period === "month" ? `${key}월` : `${key}년`} (전체 ${rows.length}건)`;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, title), "배송내역");
+    downloadWorkbook(wb, `배송내역_${key}.xlsx`);
   }
 
   const headTexts = {
@@ -1463,12 +1549,12 @@ export default function DangaLookup() {
     delivery: [
       "일별 배송 리스트",
       "날짜별로 배송 건을 정리하고 프린트해요",
-      "배송지마다 상품을 여러 개 추가할 수 있어요. 상태·송장번호·주소·메모를 입력하고, 단가와 비용은 정산 페이지에서 정리해요.",
+      "배송지마다 상품과 수량을 관리하고, 배송 상태는 정산 페이지에서 선택할 수 있어요.",
     ],
     settle: [
       "정산 페이지",
       "배송 건을 체크해 정산서를 미리 보고 프린트·엑셀로 받아요",
-      "상품별 단가를 고칠 수 있고, 설치비는 단가 합계로 계산돼요. 체크한 건은 아래 정산 기록에 날짜별로 쌓여요.",
+      "상품별 단가와 수량을 수정하고, 정산 기록을 달력에서 일·월·년 단위로 확인하고 엑셀로 내려받을 수 있어요.",
     ],
   };
 
@@ -1488,6 +1574,7 @@ export default function DangaLookup() {
             <th>송장번호</th>
             <th>박스</th>
             <th>상품명</th>
+            <th>수량</th>
             <th>주소</th>
             <th>메모</th>
             <th>설치비</th>
@@ -1509,13 +1596,14 @@ export default function DangaLookup() {
                 <td>{k === 0 ? d.invoice : null}</td>
                 <td>{k === 0 ? d.box : null}</td>
                 <td className="left">{it ? itemLabel(it) : ""}</td>
+                <td className="num">{it ? fmtNum(it.qty || 1) : "1"}</td>
                 {k === 0 && (
                   <td className="left" rowSpan={lines.length}>
                     {d.address}
                   </td>
                 )}
                 <td>{k === 0 ? d.memo : null}</td>
-                <td className="num">{fmtNum(it ? it.price : k === 0 ? d.install : 0)}</td>
+                <td className="num">{fmtNum(it ? it.price * (it.qty || 1) : k === 0 ? d.install : 0)}</td>
                 <td className="num">{k === 0 ? fmtNum(d.lift) : null}</td>
                 <td className="num">{k === 0 ? fmtNum(d.unload) : null}</td>
                 <td className="num">{k === 0 ? fmtNum(d.etc) : null}</td>
@@ -1526,7 +1614,7 @@ export default function DangaLookup() {
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={8}>선택 {settleSel.length}건 합계</td>
+            <td colSpan={9}>선택 {settleSel.length}건 합계</td>
             <td className="num">{fmtNum(settleSummary.install)}</td>
             <td className="num">{fmtNum(settleSummary.lift)}</td>
             <td className="num">{fmtNum(settleSummary.unload)}</td>
@@ -1575,13 +1663,13 @@ export default function DangaLookup() {
           {showSettlePreview ? "미리보기 닫기" : "미리보기"}
         </button>
         <button
-          onClick={exportSelectedExcel}
-          disabled={settleSel.length === 0}
-          title="체크한 건을 미리보기와 같은 표로 엑셀 다운로드"
+          onClick={exportDayExcel}
+          disabled={dayRows.length === 0}
+          title="선택한 날짜의 완료·연기·취소 배송 건을 모두 엑셀 다운로드"
           className="flex items-center gap-1 px-4 py-2 border-2 border-slate-900 bg-white text-sm font-semibold hover:bg-slate-100 disabled:opacity-40"
         >
           <Download size={16} />
-          엑셀 (선택 건)
+          엑셀 (당일 전체)
         </button>
         <button
           onClick={() => window.print()}
@@ -1720,6 +1808,16 @@ export default function DangaLookup() {
                           <span className="block text-xs text-slate-500 truncate">{d.address || "주소 미입력"}</span>
                         </span>
                       </button>
+                      <select
+                        value={d.status}
+                        onChange={(e) => updateDelivery(d.id, { status: e.target.value })}
+                        aria-label="배송 상태"
+                        className={`shrink-0 border px-2 py-1.5 text-xs font-semibold ${STATUS_STYLE[d.status] || "bg-slate-100 text-slate-700"}`}
+                      >
+                        {STATUS_LIST.map((st) => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
                       <span className="font-mono text-emerald-700 font-semibold text-sm whitespace-nowrap">
                         {formatPrice(deliveryTotal(d))}
                       </span>
@@ -1744,6 +1842,19 @@ export default function DangaLookup() {
                                 {MODE_LABEL[it.priceMode] && (
                                   <span className="text-xs text-slate-400">{MODE_LABEL[it.priceMode]}</span>
                                 )}
+                                <label className="flex items-center gap-1 text-xs text-slate-500 whitespace-nowrap">
+                                  수량
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    inputMode="numeric"
+                                    aria-label="상품 수량"
+                                    value={it.qty || 1}
+                                    onChange={(e) => updateItem(d.id, it.id, { qty: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                                    className="w-16 border border-slate-300 px-1.5 py-1 text-base text-center focus:outline-none focus:border-slate-900"
+                                  />
+                                </label>
                                 <input
                                   type="text"
                                   inputMode="numeric"
@@ -1811,80 +1922,154 @@ export default function DangaLookup() {
         )}
       </div>
 
-      {/* 정산 기록 */}
-      <div className="mt-6 bg-white border border-slate-200">
-        <div className="flex items-center gap-2 px-4 py-3">
+      {/* 정산 기록 · 달력 */}
+      <section className="mt-6 bg-white border border-slate-200 overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3">
           <button
             onClick={() => setRecordsOpen((v) => !v)}
             aria-expanded={recordsOpen}
             className="flex flex-1 min-w-0 flex-wrap items-center gap-2 text-left text-sm font-semibold text-slate-700 hover:text-slate-900"
           >
-            <CalendarDays size={16} />
-            정산 기록
-            <span className="text-xs font-normal text-slate-400">
-              체크한 배송 건 {deliveryRecords.length}일
-            </span>
+            <CalendarDays size={17} />
+            <span>정산 기록</span>
+            <span className="text-xs font-normal text-slate-400">선택된 배송 {deliveryRecords.reduce((sum, r) => sum + r.count, 0)}건 · {deliveryRecords.length}일</span>
             {recordsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
+          <span className={"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " + (syncStatus === "supabase" ? "bg-emerald-50 text-emerald-700" : syncStatus === "saving" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600")} title="배송·상품 정보는 변경할 때마다 자동 저장되고 Supabase와 동기화됩니다.">
+            <span className={"h-1.5 w-1.5 rounded-full " + (syncStatus === "supabase" ? "bg-emerald-500" : syncStatus === "saving" ? "bg-amber-500" : "bg-slate-400")} />
+            {syncStatus === "supabase" ? "Supabase 저장" : syncStatus === "saving" ? "저장 중" : syncStatus === "connecting" ? "연결 중" : "브라우저 저장"}
+          </span>
           <button
             onClick={exportAllExcel}
-            title="체크된 모든 정산 건을 미리보기와 같은 표로 엑셀 다운로드"
-            className="flex items-center gap-1 shrink-0 px-3 py-1.5 border-2 border-slate-900 bg-white text-xs sm:text-sm font-semibold hover:bg-slate-100"
+            title="완료·연기·취소를 포함한 전체 배송 내역 엑셀 다운로드"
+            className="flex items-center gap-1 shrink-0 px-3 py-1.5 border border-slate-300 bg-white text-xs sm:text-sm font-semibold hover:bg-slate-100"
           >
-            <Download size={14} />
-            전체 엑셀 다운로드
+            <Download size={14} /> 전체 엑셀
           </button>
         </div>
         {recordsOpen && (
-          <div className="border-t border-slate-100">
-            <div className="px-4 py-3">
-              <p className="text-xs font-semibold text-slate-500 mb-2">
-                배송 정산 · 정산 페이지에서 체크한 건 ({deliveryRecords.length}일)
-              </p>
-              {deliveryRecords.length === 0 ? (
-                <p className="text-sm text-slate-400 py-3">
-                  체크된 정산 건이 없어요. 위에서 배송 건을 체크하면 날짜별로 여기 쌓여요.
-                </p>
-              ) : (
-                <div className="border border-slate-200 divide-y divide-slate-100">
-                  {deliveryRecords.map((r) => (
-                    <div key={r.date}>
-                      <div
-                        className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50"
-                        onClick={() => setExpandedSettleDate((x) => (x === r.date ? null : r.date))}
+          <div className="border-t border-slate-100 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-xl bg-slate-100 p-1">
+                {[['day', '일별'], ['month', '월별'], ['year', '연별']].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    onClick={() => setRecordsMode(mode)}
+                    aria-pressed={recordsMode === mode}
+                    className={"px-3 py-1.5 text-sm font-semibold " + (recordsMode === mode ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800")}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1" />
+              <button onClick={() => shiftRecordsCursor(-1)} className="px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100" aria-label="이전 기간">◀</button>
+              <strong className="min-w-28 text-center text-sm sm:text-base text-slate-800">
+                {recordsMode === "day" ? recordsDate : recordsMode === "month" ? recordsYear + "년 " + String(recordsMonth).padStart(2, "0") + "월" : recordsYear + "년"}
+              </strong>
+              <button onClick={() => shiftRecordsCursor(1)} className="px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100" aria-label="다음 기간">▶</button>
+              <button onClick={() => { const d = todayStr(); setRecordsDate(d); setDeliveryDate(d); }} className="px-3 py-2 border border-slate-300 bg-white text-sm font-semibold hover:bg-slate-100">오늘</button>
+            </div>
+
+
+
+            {recordsMode === "month" && (
+              <div className="mt-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50 px-4 py-3">
+                  <span className="text-sm font-semibold text-slate-700">{recordsYear}년 {recordsMonth}월 정산</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-600">{monthlyRecords.reduce((sum, r) => sum + r.count, 0)}건 · <b className="font-mono text-indigo-700">{formatPrice(monthlyRecords.reduce((sum, r) => sum + r.total, 0))}</b></span>
+                    <button onClick={() => exportRecordsPeriod("month")} disabled={!recordsMonthRows.length} aria-label="월별 엑셀 다운로드" title="월별 전체 배송 엑셀 다운로드 (완료·연기·취소 포함)" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-40">
+                      <ExcelFileIcon size={17} />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {["일", "월", "화", "수", "목", "금", "토"].map((day) => <div key={day} className="py-2 text-xs font-semibold text-slate-500">{day}</div>)}
+                  {calendarCells.map((date, index) => {
+                    if (!date) return <div key={"blank-" + index} className="min-h-20 sm:min-h-24 rounded-xl bg-slate-50/70" />;
+                    const record = recordsByDate.get(date);
+                    const selected = date === recordsDate;
+                    return (
+                      <button
+                        key={date}
+                        onClick={() => { setRecordsDate(date); setDeliveryDate(date); }}
+                        aria-pressed={selected}
+                        className={"min-h-20 sm:min-h-24 rounded-xl border p-1.5 sm:p-2 text-left transition " + (selected ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : record ? "border-indigo-100 bg-white hover:bg-indigo-50" : "border-slate-100 bg-white hover:bg-slate-50")}
                       >
-                        <span className="text-sm font-semibold w-28 shrink-0">{r.date}</span>
-                        <span className="text-xs text-slate-500 flex-1">{r.count}건</span>
-                        <span className="font-mono text-emerald-700 font-semibold text-sm">{formatPrice(r.total)}</span>
-                        {expandedSettleDate === r.date ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                      </div>
-                      {expandedSettleDate === r.date && (
-                        <div className="px-3 pb-3 bg-slate-50">
-                          <p className="text-xs text-slate-500 py-2">
-                            설치비 {fmt0(r.install)} · 양중비 {fmt0(r.lift)} · 내림비 {fmt0(r.unload)} · 기타{" "}
-                            {fmt0(r.etc)}
-                          </p>
-                          {r.items.map((d) => (
-                            <div key={d.id} className="flex flex-wrap items-center gap-2 py-1.5 text-sm border-t border-slate-200">
-                              <span
-                                className={`text-xs font-semibold px-1.5 py-0.5 rounded-sm ${STATUS_STYLE[d.status] || ""}`}
-                              >
-                                {d.status}
-                              </span>
-                              <span className="flex-1 basis-48 min-w-0">
-                                <span className="block truncate">{productLabel(d)}</span>
-                                {d.address && <span className="block text-xs text-slate-500 truncate">{d.address}</span>}
-                              </span>
-                              <span className="text-xs text-slate-500 whitespace-nowrap">
-                                설치 {fmt0(d.install)} · 양중 {fmt0(d.lift)} · 내림 {fmt0(d.unload)} · 기타 {fmt0(d.etc)}
-                              </span>
-                              <span className="font-mono text-emerald-700 font-semibold w-24 text-right">
-                                {formatPrice(deliveryTotal(d))}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                        <span className={"text-xs sm:text-sm font-semibold " + (selected ? "text-indigo-700" : "text-slate-700")}>{Number(date.slice(8, 10))}</span>
+                        {record ? (
+                          <span className="mt-1 block">
+                            <span className="block text-[10px] sm:text-xs text-slate-500">{record.count}건</span>
+                            <span className="block truncate font-mono text-[10px] sm:text-xs font-semibold text-emerald-700">{formatPrice(record.total)}</span>
+                          </span>
+                        ) : <span className="mt-1 hidden text-[10px] text-slate-300 sm:block">내역 없음</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {recordsMode === "year" && (
+              <div className="mt-4">
+                <div className="mb-3 flex items-center justify-between rounded-xl bg-indigo-50 px-4 py-3">
+                  <span className="text-sm font-semibold text-slate-700">{recordsYear}년 전체</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-600">{yearlyRecords.reduce((sum, r) => sum + r.count, 0)}건 · <b className="font-mono text-indigo-700">{formatPrice(yearlyRecords.reduce((sum, r) => sum + r.total, 0))}</b></span>
+                    <button onClick={() => exportRecordsPeriod("year")} disabled={!recordsYearRows.length} aria-label="연별 엑셀 다운로드" title="연별 전체 배송 엑셀 다운로드 (완료·연기·취소 포함)" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-40">
+                      <ExcelFileIcon size={17} />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {annualMonths.map((month) => (
+                    <button
+                      key={month.prefix}
+                      onClick={() => { const d = month.prefix + "-01"; setRecordsDate(d); setDeliveryDate(d); setRecordsMode("month"); }}
+                      className={"rounded-xl border p-3 text-left transition " + (month.days ? "border-indigo-100 bg-white hover:border-indigo-300 hover:bg-indigo-50" : "border-slate-100 bg-slate-50 text-slate-400")}
+                    >
+                      <span className="block font-semibold">{month.month}월</span>
+                      <span className="mt-1 block text-xs text-slate-500">{month.count}건 · {month.days}일</span>
+                      <span className="mt-1 block truncate font-mono text-sm font-semibold text-emerald-700">{formatPrice(month.total)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recordsMode === "day" && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <strong className="text-sm text-slate-800">{shortDate(recordsDate)} 배송 내역</strong>
+                  <span className="text-sm text-slate-500">{recordsDayRows.length ? recordsDayRows.length + "건 · " + formatPrice(recordsDayRows.reduce((sum, d) => sum + deliveryTotal(d), 0)) : "배송 내역 없음"}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                <strong className="text-sm text-slate-800">{shortDate(recordsDate)} 상세 내역</strong>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">{recordsDayRows.length}건</span>
+                  <button onClick={() => exportRecordsPeriod("day")} disabled={!recordsDayRows.length} aria-label="일별 엑셀 다운로드" title="일별 전체 배송 엑셀 다운로드 (완료·연기·취소 포함)" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-40">
+                    <ExcelFileIcon size={17} />
+                  </button>
+                </div>
+              </div>
+              {!recordsDayRows.length ? (
+                <p className="px-4 py-6 text-center text-sm text-slate-400">선택한 날짜에 배송 내역이 없어요.</p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {recordsDayRows.map((d) => (
+                    <div key={d.id} className="flex flex-wrap items-center gap-2 px-4 py-3">
+                      <span className={"rounded-full px-2 py-1 text-xs font-semibold " + (STATUS_STYLE[d.status] || "bg-slate-100 text-slate-700")}>{d.status}</span>
+                      <span className="min-w-0 flex-1 basis-48">
+                        <span className="block truncate text-sm font-medium text-slate-800">{productLabel(d) || "상품 미입력"}</span>
+                        <span className="block truncate text-xs text-slate-500">{d.address || "주소 미입력"}</span>
+                      </span>
+                      <span className="text-xs text-slate-500">설치 {fmt0(d.install)} · 양중 {fmt0(d.lift)} · 내림 {fmt0(d.unload)} · 기타 {fmt0(d.etc)}</span>
+                      <span className="w-24 text-right font-mono text-sm font-semibold text-emerald-700">{formatPrice(deliveryTotal(d))}</span>
                     </div>
                   ))}
                 </div>
@@ -1892,7 +2077,7 @@ export default function DangaLookup() {
             </div>
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 
@@ -1900,35 +2085,41 @@ export default function DangaLookup() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <style>{PRINT_CSS}</style>
       {/* 헤더 */}
-      <div className="no-print bg-slate-900 text-white px-5 py-6 sm:px-8 sm:py-8">
+      <div className="no-print sticky top-0 z-20 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 text-white px-5 py-5 sm:px-8 sm:py-7 shadow-lg">
         <div className={`${view === "lookup" ? "max-w-3xl" : "max-w-5xl"} mx-auto`}>
-          <p className="text-amber-400 text-xs font-semibold tracking-widest mb-1">{headTexts[view][0]}</p>
+          <p className={"text-xs font-semibold tracking-widest mb-1 " + (view === "lookup" ? "text-indigo-300" : view === "delivery" ? "text-emerald-300" : "text-amber-300")}>{headTexts[view][0]}</p>
           <h1 className="text-xl sm:text-2xl font-bold">{headTexts[view][1]}</h1>
           <p className="text-slate-400 text-sm mt-1">{headTexts[view][2]}</p>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-5 inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/10 bg-slate-950/40 p-1.5" role="tablist" aria-label="페이지 메뉴">
             <button
+              type="button"
+              role="tab"
+              aria-selected={view === "lookup"}
               onClick={() => setView("lookup")}
-              className={`px-4 py-2 text-sm font-semibold ${
-                view === "lookup" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-              }`}
+              className={"inline-flex min-w-32 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition " + (view === "lookup" ? "border-indigo-400 bg-indigo-500 text-white shadow-lg shadow-indigo-950/20" : "border-indigo-300/25 bg-indigo-500/10 text-indigo-100 hover:bg-indigo-500/20")}
             >
-              단가 조회
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-black/10 text-[11px]">01</span>
+              <span>단가 조회</span>
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={view === "delivery"}
               onClick={() => setView("delivery")}
-              className={`px-4 py-2 text-sm font-semibold ${
-                view === "delivery" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-              }`}
+              className={"inline-flex min-w-32 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition " + (view === "delivery" ? "border-emerald-400 bg-emerald-500 text-white shadow-lg shadow-emerald-950/20" : "border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20")}
             >
-              배송 리스트
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-black/10 text-[11px]">02</span>
+              <span>배송 리스트</span>
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={view === "settle"}
               onClick={() => setView("settle")}
-              className={`px-4 py-2 text-sm font-semibold ${
-                view === "settle" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-              }`}
+              className={"inline-flex min-w-32 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition " + (view === "settle" ? "border-amber-300 bg-amber-400 text-slate-950 shadow-lg shadow-amber-950/20" : "border-amber-200/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20")}
             >
-              정산 페이지
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-black/10 text-[11px]">03</span>
+              <span>정산 페이지</span>
             </button>
           </div>
         </div>
@@ -2375,3 +2566,4 @@ export default function DangaLookup() {
     </div>
   );
 }
+
