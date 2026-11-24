@@ -1,264 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-title" content="단가 정산" />
-<meta name="theme-color" content="#0f172a" />
-<title>가구 배송 단가 조회 · 정산</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body>
-<div id="root"></div>
-<script>
-(function () {
-const {
-  useState,
-  useEffect,
-  useMemo,
-  useRef
-} = React;
-function Icon({
-  children,
-  size = 16,
-  ...props
-}) {
-  return /*#__PURE__*/React.createElement("svg", {
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: "2",
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    ...props
-  }, children);
-}
-const Search = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("circle", {
-  cx: "11",
-  cy: "11",
-  r: "8"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "21",
-  y1: "21",
-  x2: "16.65",
-  y2: "16.65"
-}));
-const Upload = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("path", {
-  d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-}), /*#__PURE__*/React.createElement("polyline", {
-  points: "17 8 12 3 7 8"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "12",
-  y1: "3",
-  x2: "12",
-  y2: "15"
-}));
-const Trash2 = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
-  points: "3 6 5 6 21 6"
-}), /*#__PURE__*/React.createElement("path", {
-  d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "10",
-  y1: "11",
-  x2: "10",
-  y2: "17"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "14",
-  y1: "11",
-  x2: "14",
-  y2: "17"
-}));
-const Pencil = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("path", {
-  d: "M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"
-}));
-const Plus = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("line", {
-  x1: "12",
-  y1: "5",
-  x2: "12",
-  y2: "19"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "5",
-  y1: "12",
-  x2: "19",
-  y2: "12"
-}));
-const X = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("line", {
-  x1: "18",
-  y1: "6",
-  x2: "6",
-  y2: "18"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "6",
-  y1: "6",
-  x2: "18",
-  y2: "18"
-}));
-const ChevronDown = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
-  points: "6 9 12 15 18 9"
-}));
-const ChevronUp = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
-  points: "18 15 12 9 6 15"
-}));
-const Check = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
-  points: "20 6 9 17 4 12"
-}));
-const Save = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("path", {
-  d: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
-}), /*#__PURE__*/React.createElement("polyline", {
-  points: "17 21 17 13 7 13 7 21"
-}), /*#__PURE__*/React.createElement("polyline", {
-  points: "7 3 7 8 15 8"
-}));
-const Printer = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
-  points: "6 9 6 2 18 2 18 9"
-}), /*#__PURE__*/React.createElement("path", {
-  d: "M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
-}), /*#__PURE__*/React.createElement("rect", {
-  x: "6",
-  y: "14",
-  width: "12",
-  height: "8"
-}));
-const Download = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("path", {
-  d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
-}), /*#__PURE__*/React.createElement("polyline", {
-  points: "7 10 12 15 17 10"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "12",
-  y1: "15",
-  x2: "12",
-  y2: "3"
-}));
-const CalendarDays = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("rect", {
-  x: "3",
-  y: "4",
-  width: "18",
-  height: "18",
-  rx: "2",
-  ry: "2"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "16",
-  y1: "2",
-  x2: "16",
-  y2: "6"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "8",
-  y1: "2",
-  x2: "8",
-  y2: "6"
-}), /*#__PURE__*/React.createElement("line", {
-  x1: "3",
-  y1: "10",
-  x2: "21",
-  y2: "10"
-}));
-function loadJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch (e) {
-    return fallback;
-  }
-}
-function saveJSON(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch (e) {
-    console.error("저장 실패:", key, e);
-    return false;
-  }
-}
-const SEED_KEY = "danga_seed_version";
-const SEED_VERSION = 2;
-function productKey(p) {
-  return normalizeName(p.name) + "|" + ((p.reason || "기본").trim() || "기본") + "|" + (p.effectiveDate || "");
-}
-// 이미 쓰던 기기: 기존 상품(원단가 등)은 그대로 두고, 적용단가만 붙이고 새 엑셀의 신규 행만 추가
-function mergeDefaults(existing) {
-  const out = existing.map(e => ({
-    ...e
-  }));
-  const byId = new Map(out.map(e => [e.id, e]));
-  const byKey = new Map();
-  out.forEach(e => {
-    const k = productKey(e);
-    if (!byKey.has(k)) byKey.set(k, []);
-    byKey.get(k).push(e);
-  });
-  DEFAULT_PRODUCTS.forEach(d => {
-    let hit = byId.get(d.id);
-    if (hit) {
-      const l = byKey.get(productKey(hit));
-      const i = l ? l.indexOf(hit) : -1;
-      if (i > -1) l.splice(i, 1);
-    } else {
-      const l = byKey.get(productKey(d));
-      hit = l && l.length ? l.shift() : null;
-    }
-    if (hit) {
-      if ((hit.applied === undefined || hit.applied === null) && typeof d.applied === "number") hit.applied = d.applied;
-      return;
-    }
-    if (String(d.id).indexOf("seed2-") === 0) out.push({
-      ...d
-    });
-  });
-  return out;
-}
-const PRODUCTS_KEY = "danga_products";
-const REASONS_KEY = "danga_custom_reasons";
-const FEE_KEY = "danga_fee_rate";
-const DELIVERIES_KEY = "danga_deliveries";
-const STATUS_LIST = ["완료", "연기", "취소"];
-const STATUS_STYLE = {
-  완료: "bg-emerald-100 text-emerald-700",
-  연기: "bg-amber-100 text-amber-800",
-  취소: "bg-red-100 text-red-700"
-};
-const PRINT_CSS = `
-.print-only { display: none; }
-.print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.print-table th, .print-table td { border: 1px solid #333; padding: 4px 6px; vertical-align: top; word-break: break-all; }
-.print-table th { background: #eee; }
-.print-table .num { text-align: right; white-space: nowrap; }
-.print-table tfoot td { font-weight: 700; background: #f5f5f5; }
-table.print-table.delivery-table { table-layout: fixed; margin: 0 auto; font-size: 15px; }
-table.print-table.delivery-table th, table.print-table.delivery-table td { text-align: center; vertical-align: middle; padding: 8px 10px; word-break: keep-all; overflow-wrap: anywhere; }
-table.print-table.delivery-table th:nth-child(1), table.print-table.delivery-table td:nth-child(1), table.print-table.delivery-table th:nth-child(2), table.print-table.delivery-table td:nth-child(2) { padding-left: 2px; padding-right: 2px; }
-.delivery-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; text-align: center; }
-table.print-table.delivery-table td.left, table.print-table.delivery-table td.time-cell { text-align: left; }
-.tp-on { display: inline-block; border: 1.5px solid #111; border-radius: 3px; padding: 0 6px; font-weight: 700; }
-.tp-off { display: inline-block; padding: 0 7.5px; color: #9ca3af; }
-.tp-note { margin-left: 4px; }
-table.print-table.settle-table th, table.print-table.settle-table td { text-align: center; vertical-align: middle; }
-table.print-table.settle-table td.left { text-align: left; }
-table.print-table.settle-table td.num { text-align: right; }
-@media print {
-  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  @page { size: A4 landscape; margin: 8mm; }
-  .no-print { display: none !important; }
-  .print-only { display: block !important; }
-  .min-h-screen { min-height: 0 !important; }
-  .bg-slate-50 { background: #fff !important; }
-  .print-table { font-size: 10px; }
-  .print-table th, .print-table td { padding: 3px 4px; }
-  table.print-table.delivery-table { font-size: 9px; }
-  table.print-table.delivery-table th, table.print-table.delivery-table td { padding: 5px 6px; }
-  .delivery-title { font-size: 9px; margin-bottom: 4px; }
-  .tp-on { border-width: 1px; border-radius: 2px; padding: 0 3px; }
-  .tp-off { padding: 0 4px; }
-}
-`;
-const DEFAULT_REASONS = ["기본", "재출고", "프로모션", "내림서비스"];
-const DEFAULT_PRODUCTS = [{
+<html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/><meta name="theme-color" content="#0f172a"/><title>가구 배송 단가 조회 · 정산</title><script src="https://unpkg.com/react@18/umd/react.production.min.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script></head><body><div id="root"></div><script>const DEFAULT_PRODUCTS = [{
   "id": "seed-0",
   "name": "(주)보니애가구 에르고 4인용 리클라이너 소파 팔걸이 우측 방문설치, 샌드 아이보리",
   "price": 32470,
@@ -13809,6 +13550,293 @@ const DEFAULT_PRODUCTS = [{
   "reason": "기본",
   "effectiveDate": "2026-09-01"
 }];
+const { useState, useEffect, useMemo, useRef } = React;
+function Icon({
+  children,
+  size = 16,
+  ...props
+}) {
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "2",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    ...props
+  }, children);
+}
+const Search = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("circle", {
+  cx: "11",
+  cy: "11",
+  r: "8"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "21",
+  y1: "21",
+  x2: "16.65",
+  y2: "16.65"
+}));
+const Upload = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("path", {
+  d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+}), /*#__PURE__*/React.createElement("polyline", {
+  points: "17 8 12 3 7 8"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "12",
+  y1: "3",
+  x2: "12",
+  y2: "15"
+}));
+const Trash2 = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
+  points: "3 6 5 6 21 6"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "10",
+  y1: "11",
+  x2: "10",
+  y2: "17"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "14",
+  y1: "11",
+  x2: "14",
+  y2: "17"
+}));
+const Pencil = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("path", {
+  d: "M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+}));
+const Plus = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("line", {
+  x1: "12",
+  y1: "5",
+  x2: "12",
+  y2: "19"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "5",
+  y1: "12",
+  x2: "19",
+  y2: "12"
+}));
+const X = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("line", {
+  x1: "18",
+  y1: "6",
+  x2: "6",
+  y2: "18"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "6",
+  y1: "6",
+  x2: "18",
+  y2: "18"
+}));
+const ChevronDown = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
+  points: "6 9 12 15 18 9"
+}));
+const ChevronUp = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
+  points: "18 15 12 9 6 15"
+}));
+const Check = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
+  points: "20 6 9 17 4 12"
+}));
+const Save = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("path", {
+  d: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+}), /*#__PURE__*/React.createElement("polyline", {
+  points: "17 21 17 13 7 13 7 21"
+}), /*#__PURE__*/React.createElement("polyline", {
+  points: "7 3 7 8 15 8"
+}));
+const Printer = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("polyline", {
+  points: "6 9 6 2 18 2 18 9"
+}), /*#__PURE__*/React.createElement("path", {
+  d: "M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"
+}), /*#__PURE__*/React.createElement("rect", {
+  x: "6",
+  y: "14",
+  width: "12",
+  height: "8"
+}));
+const Download = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("path", {
+  d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+}), /*#__PURE__*/React.createElement("polyline", {
+  points: "7 10 12 15 17 10"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "12",
+  y1: "15",
+  x2: "12",
+  y2: "3"
+}));
+const CalendarDays = p => /*#__PURE__*/React.createElement(Icon, p, /*#__PURE__*/React.createElement("rect", {
+  x: "3",
+  y: "4",
+  width: "18",
+  height: "18",
+  rx: "2",
+  ry: "2"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "16",
+  y1: "2",
+  x2: "16",
+  y2: "6"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "8",
+  y1: "2",
+  x2: "8",
+  y2: "6"
+}), /*#__PURE__*/React.createElement("line", {
+  x1: "3",
+  y1: "10",
+  x2: "21",
+  y2: "10"
+}));
+if (!localStorage.getItem("danga_products")) { try { localStorage.setItem("danga_products", JSON.stringify(DEFAULT_PRODUCTS)); } catch (e) {} }
+const DANGA_SUPABASE_URL = "https://yzgsyyolhsxvavcmussi.supabase.co";
+const DANGA_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_2Q7QKyw2ES1G5zfTt3ngaQ_g14Q2AsE";
+const DANGA_SUPABASE_CLIENT = window.supabase?.createClient ? window.supabase.createClient(DANGA_SUPABASE_URL, DANGA_SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }) : null;
+let dangaCloudUserId = null;
+let dangaCloudState = null;
+let dangaCloudReady = null;
+let dangaCloudWriteQueue = Promise.resolve();
+let dangaCloudTimer = null;
+function setDangaSyncStatus(status) {
+  if (window.storage) window.storage.syncStatus = status;
+  window.dispatchEvent(new CustomEvent("danga-storage-status", { detail: { status } }));
+}
+function readDangaLocalState() {
+  const state = {};
+  ["products", "custom_reasons", "fee_rate", "deliveries"].forEach((key) => {
+    try { const value = localStorage.getItem("danga_" + key); if (value !== null) state[key] = value; } catch (e) {}
+  });
+  return state;
+}
+async function flushDangaCloudState() {
+  if (!dangaCloudUserId || !dangaCloudState) return;
+  const payload = { user_id: dangaCloudUserId, state: { ...dangaCloudState }, updated_at: new Date().toISOString() };
+  const { error } = await DANGA_SUPABASE_CLIENT.from("danga_user_state").upsert(payload, { onConflict: "user_id" });
+  if (error) throw error;
+}
+async function initializeDangaCloudState() {
+  if (!DANGA_SUPABASE_CLIENT) throw new Error("Supabase client library unavailable");
+  setDangaSyncStatus("connecting");
+  const { data: authData, error: authError } = await DANGA_SUPABASE_CLIENT.auth.getSession();
+  if (authError) throw authError;
+  let user = authData?.session?.user || null;
+  if (!user) {
+    const { data, error } = await DANGA_SUPABASE_CLIENT.auth.signInAnonymously();
+    if (error) throw error;
+    user = data?.user || data?.session?.user;
+  }
+  if (!user?.id) throw new Error("Supabase anonymous session unavailable");
+  dangaCloudUserId = user.id;
+  const { data: row, error: readError } = await DANGA_SUPABASE_CLIENT.from("danga_user_state").select("state,updated_at").eq("user_id", user.id).maybeSingle();
+  if (readError) throw readError;
+  const localState = readDangaLocalState();
+  const cloudState = row?.state && typeof row.state === "object" ? Object.fromEntries(Object.entries(row.state).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])) : null;
+  if (cloudState && Object.keys(cloudState).length) {
+    const localStamp = Number(localStorage.getItem("danga_supabase_local_updated_at")) || 0;
+    const cloudStamp = Date.parse(row.updated_at || "") || 0;
+    dangaCloudState = localStamp > cloudStamp ? { ...cloudState, ...localState } : { ...cloudState };
+    Object.entries(localState).forEach(([k, v]) => { if (!(k in dangaCloudState)) dangaCloudState[k] = v; });
+  } else {
+    dangaCloudState = localState;
+  }
+  await flushDangaCloudState();
+  Object.entries(dangaCloudState).forEach(([k, v]) => { try { localStorage.setItem("danga_" + k, String(v)); } catch (e) {} });
+  setDangaSyncStatus("supabase");
+  return dangaCloudState;
+}
+function ensureDangaCloudState() {
+  if (!dangaCloudReady) dangaCloudReady = initializeDangaCloudState().catch((error) => { dangaCloudReady = null; setDangaSyncStatus("local"); throw error; });
+  return dangaCloudReady;
+}
+window.storage = {
+  syncStatus: "connecting",
+  async get(key) {
+    try {
+      const state = await ensureDangaCloudState();
+      const value = state[key] ?? localStorage.getItem("danga_" + key);
+      return value == null ? null : { value: String(value) };
+    } catch (error) {
+      console.error("Supabase read failed; using browser storage", error);
+      setDangaSyncStatus("local");
+      try { const value = localStorage.getItem("danga_" + key); return value == null ? null : { value }; } catch (e) { return null; }
+    }
+  },
+  async set(key, value) {
+    const text = String(value);
+    try { localStorage.setItem("danga_" + key, text); localStorage.setItem("danga_supabase_local_updated_at", String(Date.now())); } catch (e) {}
+    try {
+      await ensureDangaCloudState();
+      dangaCloudState = { ...dangaCloudState, [key]: text };
+      setDangaSyncStatus("saving");
+      if (dangaCloudTimer) clearTimeout(dangaCloudTimer);
+      dangaCloudTimer = setTimeout(() => {
+        const pending = dangaCloudWriteQueue.then(() => flushDangaCloudState());
+        dangaCloudWriteQueue = pending.then(() => setDangaSyncStatus("supabase")).catch((error) => { console.error("Supabase write failed; data remains in browser storage", error); setDangaSyncStatus("local"); });
+      }, 700);
+      return true;
+    } catch (error) {
+      console.error("Supabase write unavailable; data remains in browser storage", error);
+      setDangaSyncStatus("local");
+      return false;
+    }
+  }
+};
+window.addEventListener("pagehide", () => { if (dangaCloudUserId && dangaCloudState) flushDangaCloudState().catch(() => {}); });
+function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
+const PRODUCTS_KEY = "products";
+const REASONS_KEY = "custom_reasons";
+const FEE_KEY = "fee_rate";
+const DELIVERIES_KEY = "deliveries";
+// window.storage is provided by index.html and syncs these keys to Supabase with a browser fallback.
+const STATUS_LIST = ["완료", "연기", "취소"];
+const STATUS_STYLE = {
+  완료: "bg-emerald-100 text-emerald-700",
+  연기: "bg-amber-100 text-amber-800",
+  취소: "bg-red-100 text-red-700"
+};
+const PRINT_CSS = `
+.print-only { display: none; }
+.print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.print-table th, .print-table td { border: 1px solid #333; padding: 4px 6px; vertical-align: top; word-break: break-all; }
+.print-table th { background: #eee; }
+.print-table .num { text-align: right; white-space: nowrap; }
+.print-table tfoot td { font-weight: 700; background: #f5f5f5; }
+table.print-table.delivery-table { table-layout: fixed; margin: 0 auto; font-size: 15px; }
+table.print-table.delivery-table th, table.print-table.delivery-table td { text-align: center; vertical-align: middle; padding: 8px 10px; word-break: keep-all; overflow-wrap: anywhere; }
+table.print-table.delivery-table th:nth-child(1), table.print-table.delivery-table td:nth-child(1), table.print-table.delivery-table th:nth-child(2), table.print-table.delivery-table td:nth-child(2) { padding-left: 2px; padding-right: 2px; }
+.delivery-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; text-align: center; }
+table.print-table.delivery-table td.left, table.print-table.delivery-table td.time-cell { text-align: left; }
+.tp-on { display: inline-block; border: 1.5px solid #111; border-radius: 3px; padding: 0 6px; font-weight: 700; }
+.tp-off { display: inline-block; padding: 0 7.5px; color: #9ca3af; }
+.tp-note { margin-left: 4px; }
+table.print-table.settle-table th, table.print-table.settle-table td { text-align: center; vertical-align: middle; }
+table.print-table.settle-table td.left { text-align: left; }
+table.print-table.settle-table td.num { text-align: right; }
+html { color-scheme: light; }
+body { margin: 0; background: #f8fafc; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.min-h-screen { background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%); }
+.min-h-screen .no-print button { border-radius: 9px; transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.min-h-screen .no-print button:hover:not(:disabled) { transform: translateY(-1px); }
+.min-h-screen .no-print input:not([type="checkbox"]):not([type="radio"]), .min-h-screen .no-print select { border-radius: 8px; }
+.min-h-screen .no-print input:focus, .min-h-screen .no-print select:focus { box-shadow: 0 0 0 3px rgba(99, 102, 241, .15); }
+.min-h-screen .no-print section.bg-white { border-radius: 16px; box-shadow: 0 8px 24px rgba(15, 23, 42, .06); }
+.min-h-screen .no-print .bg-white.border, .min-h-screen .no-print .bg-white.border-2 { border-radius: 12px; }
+@media print {
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { size: A4 landscape; margin: 8mm; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .min-h-screen { min-height: 0 !important; }
+  .bg-slate-50 { background: #fff !important; }
+  .print-table { font-size: 10px; }
+  .print-table th, .print-table td { padding: 3px 4px; }
+  table.print-table.delivery-table { font-size: 9px; }
+  table.print-table.delivery-table th, table.print-table.delivery-table td { padding: 5px 6px; }
+  .delivery-title { font-size: 9px; margin-bottom: 4px; }
+  .tp-on { border-width: 1px; border-radius: 2px; padding: 0 3px; }
+  .tp-off { padding: 0 4px; }
+}
+`;
+const DEFAULT_REASONS = ["기본", "재출고", "프로모션", "내림서비스"];
 const REASON_STYLE = {
   기본: "bg-slate-100 text-slate-700",
   재출고: "bg-blue-100 text-blue-700",
@@ -13850,6 +13878,9 @@ function formatPrice(n) {
 }
 function todayStr() {
   const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function dateInputStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 const DEFAULT_FEE_RATE = 15;
@@ -13895,7 +13926,7 @@ function buildGroups(list, asOf) {
     })
   })).sort((a, b) => a.name.localeCompare(b.name));
 }
-const SHEET_HEAD = ["구분", "상태", "배송일", "송장번호", "박스", "상품명", "주소", "메모", "설치비", "양중비", "내림비", "기타비용", "합계"];
+const SHEET_HEAD = ["구분", "상태", "배송일", "송장번호", "박스", "상품명", "수량", "주소", "메모", "설치비", "양중비", "내림비", "기타비용", "합계"];
 const FLAG_LIST = [{
   key: "direct",
   label: "직접설치",
@@ -13956,26 +13987,32 @@ function optNum(v) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 function itemsOf(d) {
-  if (Array.isArray(d.items) && d.items.length) return d.items;
+  if (Array.isArray(d.items) && d.items.length) {
+    return d.items.map(it => ({
+      ...it,
+      qty: Math.max(1, Math.floor(Number(it.qty) || 1))
+    }));
+  }
   if (d.productName || d.install) {
     return [{
       id: "legacy",
       name: d.productName || "",
       reason: d.reason || "기본",
-      price: d.install || 0
+      price: d.install || 0,
+      qty: 1
     }];
   }
   return [];
 }
 function sumItems(items) {
-  return items.reduce((sum, it) => sum + (Number(it.price) || 0), 0);
+  return items.reduce((sum, it) => sum + (Number(it.price) || 0) * Math.max(1, Number(it.qty) || 1), 0);
 }
 function itemLabel(it) {
   return `${it.name || ""}${it.reason && it.reason !== "기본" ? ` (${it.reason})` : ""}`;
 }
 function productLabel(d) {
   const its = itemsOf(d);
-  return its.length ? its.map(itemLabel).join(" + ") : d.productName || "";
+  return its.length ? its.map(it => `${itemLabel(it)}${Number(it.qty) > 1 ? ` × ${it.qty}` : ""}`).join(" + ") : d.productName || "";
 }
 function applyItems(d, items) {
   const reasons = [...new Set(items.map(it => it.reason || "기본"))];
@@ -14009,7 +14046,7 @@ function buildSettleSheet(rows, title) {
     },
     e: {
       r: 0,
-      c: 12
+      c: 13
     }
   }];
   const groups = [];
@@ -14019,8 +14056,9 @@ function buildSettleSheet(rows, title) {
     const lines = its.length ? its : [null];
     const first = aoa.length + 1;
     lines.forEach((it, k) => {
-      const inst = it ? Number(it.price) || 0 : d.install || 0;
-      aoa.push([k === 0 ? flagsText(d) : null, k === 0 ? d.status || "" : null, k === 0 ? shortDate(d.date || "") : null, k === 0 ? d.invoice || "" : null, k === 0 ? d.box || "" : null, it ? itemLabel(it) : "", k === 0 ? d.address || "" : null, k === 0 ? d.memo || "" : null, inst, k === 0 ? d.lift || 0 : null, k === 0 ? d.unload || 0 : null, k === 0 ? d.etc || 0 : null, k === 0 ? deliveryTotal(d) : null]);
+      const quantity = it ? Math.max(1, Number(it.qty) || 1) : 1;
+      const inst = it ? (Number(it.price) || 0) * quantity : d.install || 0;
+      aoa.push([k === 0 ? flagsText(d) : null, k === 0 ? d.status || "" : null, k === 0 ? shortDate(d.date || "") : null, k === 0 ? d.invoice || "" : null, k === 0 ? d.box || "" : null, it ? itemLabel(it) : "", quantity, k === 0 ? d.address || "" : null, k === 0 ? d.memo || "" : null, inst, k === 0 ? d.lift || 0 : null, k === 0 ? d.unload || 0 : null, k === 0 ? d.etc || 0 : null, k === 0 ? deliveryTotal(d) : null]);
       sums[0] += inst;
     });
     sums[1] += d.lift || 0;
@@ -14035,27 +14073,27 @@ function buildSettleSheet(rows, title) {
     if (lines.length > 1) merges.push({
       s: {
         r: first - 1,
-        c: 6
+        c: 7
       },
       e: {
         r: first + lines.length - 2,
-        c: 6
+        c: 7
       }
     });
   });
   const firstRow = 3;
   const lastRow = aoa.length;
   const foot = aoa.length + 1;
-  aoa.push([`선택 ${rows.length}건 합계`, null, null, null, null, null, null, null, ...sums]);
+  aoa.push([`선택 ${rows.length}건 합계`, null, null, null, null, null, null, null, null, ...sums]);
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   groups.forEach(g => {
-    ws["M" + g.first] = {
+    ws["N" + g.first] = {
       t: "n",
-      f: g.last === g.first ? `SUM(I${g.first}:L${g.first})` : `SUM(I${g.first}:I${g.last})+SUM(J${g.first}:L${g.first})`,
+      f: g.last === g.first ? `SUM(J${g.first}:M${g.first})` : `SUM(J${g.first}:J${g.last})+SUM(K${g.first}:M${g.first})`,
       v: deliveryTotal(g.d)
     };
   });
-  ["I", "J", "K", "L", "M"].forEach((c, k) => {
+  ["J", "K", "L", "M", "N"].forEach((c, k) => {
     ws[c + foot] = lastRow >= firstRow ? {
       t: "n",
       f: `SUM(${c}${firstRow}:${c}${lastRow})`,
@@ -14065,7 +14103,7 @@ function buildSettleSheet(rows, title) {
       v: 0
     };
   });
-  setNumFmt(ws, ["I", "J", "K", "L", "M"], firstRow, foot);
+  setNumFmt(ws, ["J", "K", "L", "M", "N"], firstRow, foot);
   merges.push({
     s: {
       r: foot - 1,
@@ -14073,11 +14111,11 @@ function buildSettleSheet(rows, title) {
     },
     e: {
       r: foot - 1,
-      c: 7
+      c: 8
     }
   });
   ws["!merges"] = merges;
-  ws["!cols"] = [6, 6, 11, 14, 8, 42, 36, 20, 10, 10, 10, 10, 12].map(w => ({
+  ws["!cols"] = [6, 6, 11, 14, 8, 42, 8, 36, 20, 10, 10, 10, 10, 12].map(w => ({
     wch: w
   }));
   return ws;
@@ -14092,6 +14130,22 @@ function Field({
   }, /*#__PURE__*/React.createElement("span", {
     className: "block text-xs text-slate-500 mb-0.5"
   }, label), children);
+}
+function ExcelFileIcon({
+  size = 16,
+  ...props
+}) {
+  return /*#__PURE__*/React.createElement(Icon, _extends({
+    size: size
+  }, props), /*#__PURE__*/React.createElement("path", {
+    d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M14 2v6h6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "m8 12 4 6m0-6-4 6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M14 13h3m-3 3h3"
+  }));
 }
 function excelCellToDateStr(raw) {
   if (raw === null || raw === undefined || raw === "") return "";
@@ -14120,6 +14174,7 @@ function DangaLookup() {
   const [customReasons, setCustomReasons] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(() => window.storage?.syncStatus || "connecting");
   const [query, setQuery] = useState("");
   const [manageOpen, setManageOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -14162,6 +14217,11 @@ function DangaLookup() {
   const [settleListOpen, setSettleListOpen] = useState(true);
   const [settleOpenRows, setSettleOpenRows] = useState(() => new Set());
   const [expandedSettleDate, setExpandedSettleDate] = useState(null);
+  const [recordsMode, setRecordsMode] = useState("month");
+  const [recordsDate, setRecordsDate] = useState(() => deliveryDate);
+  useEffect(() => {
+    setRecordsDate(deliveryDate);
+  }, [deliveryDate]);
   const [exportMsg, setExportMsg] = useState("");
   const [showSettlePreview, setShowSettlePreview] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(true);
@@ -14172,7 +14232,7 @@ function DangaLookup() {
     const next = Number.isFinite(n) ? Math.min(Math.max(n, 0), 100) : 0;
     setFeeRate(next);
     try {
-      localStorage.setItem(FEE_KEY, String(next));
+      window.storage.set(FEE_KEY, String(next), false).catch(() => {});
     } catch (e) {}
   }
   const allReasons = useMemo(() => {
@@ -14191,43 +14251,60 @@ function DangaLookup() {
     });
   }, [sortedProducts, manageTokens]);
   useEffect(() => {
-    try {
-      const fee = localStorage.getItem(FEE_KEY);
-      if (fee !== null) {
-        const n = Number(fee);
-        if (Number.isFinite(n)) setFeeRate(Math.min(Math.max(n, 0), 100));
-      }
-    } catch (e) {}
-    try {
-      const raw = localStorage.getItem(PRODUCTS_KEY);
-      if (raw === null) {
-        // 처음 여는 기기: 기본 상품 데이터를 심어둠
-        saveJSON(PRODUCTS_KEY, DEFAULT_PRODUCTS);
-        localStorage.setItem(SEED_KEY, String(SEED_VERSION));
-        setProducts(DEFAULT_PRODUCTS);
-      } else {
-        let list = JSON.parse(raw);
-        if (localStorage.getItem(SEED_KEY) !== String(SEED_VERSION)) {
-          list = mergeDefaults(list);
-          saveJSON(PRODUCTS_KEY, list);
-          localStorage.setItem(SEED_KEY, String(SEED_VERSION));
-        }
-        setProducts(list);
-      }
-    } catch (e) {
-      setProducts([]);
-    }
-    setCustomReasons(loadJSON(REASONS_KEY, []));
-    setDeliveries(loadJSON(DELIVERIES_KEY, []));
-    setLoaded(true);
+    const onStorageStatus = event => setSyncStatus(event.detail?.status || window.storage?.syncStatus || "local");
+    window.addEventListener("danga-storage-status", onStorageStatus);
+    if (window.storage?.syncStatus) setSyncStatus(window.storage.syncStatus);
+    return () => window.removeEventListener("danga-storage-status", onStorageStatus);
   }, []);
-  function persistProducts(next) {
+  useEffect(() => {
+    (async () => {
+      try {
+        const resFee = await window.storage.get(FEE_KEY, false);
+        if (resFee && resFee.value) {
+          const n = Number(resFee.value);
+          if (Number.isFinite(n)) setFeeRate(Math.min(Math.max(n, 0), 100));
+        }
+      } catch (e) {
+        // 최초 사용, 무시
+      }
+      try {
+        const resDel = await window.storage.get(DELIVERIES_KEY, false);
+        if (resDel && resDel.value) setDeliveries(JSON.parse(resDel.value));
+      } catch (e) {
+        // 최초 사용, 무시
+      }
+      try {
+        const res = await window.storage.get(PRODUCTS_KEY, false);
+        if (res && res.value) setProducts(JSON.parse(res.value));
+      } catch (e) {
+        // 최초 사용, 무시
+      }
+      try {
+        const res2 = await window.storage.get(REASONS_KEY, false);
+        if (res2 && res2.value) setCustomReasons(JSON.parse(res2.value));
+      } catch (e) {
+        // 최초 사용, 무시
+      }
+      setLoaded(true);
+    })();
+  }, []);
+  async function persistProducts(next) {
     setProducts(next);
-    setSaveError(!saveJSON(PRODUCTS_KEY, next));
+    try {
+      const result = await window.storage.set(PRODUCTS_KEY, JSON.stringify(next), false);
+      setSaveError(!result);
+    } catch (e) {
+      console.error(e);
+      setSaveError(true);
+    }
   }
-  function persistReasons(next) {
+  async function persistReasons(next) {
     setCustomReasons(next);
-    saveJSON(REASONS_KEY, next);
+    try {
+      await window.storage.set(REASONS_KEY, JSON.stringify(next), false);
+    } catch (e) {
+      console.error(e);
+    }
   }
   function addCustomReasonToList(reason) {
     const r = reason.trim();
@@ -14428,9 +14505,15 @@ function DangaLookup() {
     reader.readAsArrayBuffer(file);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
-  function persistDeliveries(next) {
+  async function persistDeliveries(next) {
     setDeliveries(next);
-    saveJSON(DELIVERIES_KEY, next);
+    try {
+      const result = await window.storage.set(DELIVERIES_KEY, JSON.stringify(next), false);
+      setSaveError(!result);
+    } catch (e) {
+      console.error(e);
+      setSaveError(true);
+    }
   }
   function updateDelivery(id, patch) {
     persistDeliveries(deliveries.map(d => d.id === id ? {
@@ -14484,6 +14567,7 @@ function DangaLookup() {
       id: uid(),
       name: normalizeName(entry.name),
       reason: (entry.reason || "기본").trim() || "기본",
+      qty: 1,
       price: useApplied ? entry.applied : netOf(entry.price, feeRate),
       priceMode: useApplied ? "applied" : "net",
       basePrice: hasNum(entry.price) ? entry.price : null,
@@ -14652,29 +14736,29 @@ function DangaLookup() {
   });
   const deliverySheet = /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
     className: "delivery-title"
-  }, "배송 리스트 · ", deliveryDate), /*#__PURE__*/React.createElement("table", {
+  }, "\uBC30\uC1A1 \uB9AC\uC2A4\uD2B8 \xB7 ", deliveryDate), /*#__PURE__*/React.createElement("table", {
     className: "print-table delivery-table"
   }, /*#__PURE__*/React.createElement("colgroup", null, /*#__PURE__*/React.createElement("col", {
     style: {
-      width: "9%"
+      width: "5%"
     }
   }), /*#__PURE__*/React.createElement("col", {
     style: {
-      width: "9%"
+      width: "5%"
     }
   }), /*#__PURE__*/React.createElement("col", {
     style: {
-      width: "33%"
+      width: "37%"
     }
   }), /*#__PURE__*/React.createElement("col", {
     style: {
-      width: "34%"
+      width: "38%"
     }
   }), /*#__PURE__*/React.createElement("col", {
     style: {
       width: "15%"
     }
-  })), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "구분"), /*#__PURE__*/React.createElement("th", null, "박스"), /*#__PURE__*/React.createElement("th", null, "상품명"), /*#__PURE__*/React.createElement("th", null, "주소"), /*#__PURE__*/React.createElement("th", null, "시간"))), /*#__PURE__*/React.createElement("tbody", null, sheetRows.map((d, idx) => /*#__PURE__*/React.createElement("tr", {
+  })), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "\uAD6C\uBD84"), /*#__PURE__*/React.createElement("th", null, "\uBC15\uC2A4"), /*#__PURE__*/React.createElement("th", null, "\uC0C1\uD488\uBA85"), /*#__PURE__*/React.createElement("th", null, "\uC8FC\uC18C"), /*#__PURE__*/React.createElement("th", null, "\uC2DC\uAC04"))), /*#__PURE__*/React.createElement("tbody", null, sheetRows.map((d, idx) => /*#__PURE__*/React.createElement("tr", {
     key: d.id
   }, /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement(FlagLines, {
     d: d
@@ -14709,7 +14793,7 @@ function DangaLookup() {
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setDeliveryDate(shiftDate(deliveryDate, -1)),
     className: "px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100"
-  }, "◀ 전날"), /*#__PURE__*/React.createElement("input", {
+  }, "\u25C0 \uC804\uB0A0"), /*#__PURE__*/React.createElement("input", {
     type: "date",
     value: deliveryDate,
     onChange: e => e.target.value && setDeliveryDate(e.target.value),
@@ -14717,10 +14801,10 @@ function DangaLookup() {
   }), /*#__PURE__*/React.createElement("button", {
     onClick: () => setDeliveryDate(shiftDate(deliveryDate, 1)),
     className: "px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100"
-  }, "다음날 ▶"), /*#__PURE__*/React.createElement("button", {
+  }, "\uB2E4\uC74C\uB0A0 \u25B6"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setDeliveryDate(todayStr()),
     className: "px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100"
-  }, "오늘"), /*#__PURE__*/React.createElement("div", {
+  }, "\uC624\uB298"), /*#__PURE__*/React.createElement("div", {
     className: "flex-1"
   }), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDeliveryPreview(v => !v),
@@ -14731,18 +14815,18 @@ function DangaLookup() {
     className: "flex items-center gap-1 bg-slate-900 text-white font-semibold text-sm px-4 py-2 hover:bg-slate-800"
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 16
-  }), "프린트")), /*#__PURE__*/React.createElement("p", {
+  }), "\uD504\uB9B0\uD2B8")), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mt-2"
-  }, deliveryDate, " · 배송 ", dayRows.length, "건 (완료 ", daySummary.by.완료.count, " · 연기 ", daySummary.by.연기.count, " · 취소", " ", daySummary.by.취소.count, ")"), showDeliveryPreview && dayRows.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, deliveryDate, " \xB7 \uBC30\uC1A1 ", dayRows.length, "\uAC74 (\uC644\uB8CC ", daySummary.by.완료.count, " \xB7 \uC5F0\uAE30 ", daySummary.by.연기.count, " \xB7 \uCDE8\uC18C", " ", daySummary.by.취소.count, ")"), showDeliveryPreview && dayRows.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "mt-4 bg-white border-2 border-slate-900 p-4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm font-semibold"
-  }, "배송 리스트 미리보기 (인쇄 모양 그대로)"), /*#__PURE__*/React.createElement("button", {
+  }, "\uBC30\uC1A1 \uB9AC\uC2A4\uD2B8 \uBBF8\uB9AC\uBCF4\uAE30 (\uC778\uC1C4 \uBAA8\uC591 \uADF8\uB300\uB85C)"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowDeliveryPreview(false),
     className: "text-xs text-slate-500 underline"
-  }, "닫기")), /*#__PURE__*/React.createElement("div", {
+  }, "\uB2EB\uAE30")), /*#__PURE__*/React.createElement("div", {
     className: "overflow-x-auto"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -14756,7 +14840,7 @@ function DangaLookup() {
     onClick: () => setListOpen(v => !v),
     "aria-expanded": listOpen,
     className: "flex flex-1 items-center gap-2 text-left text-sm font-semibold"
-  }, "배송 내역 (", dayRows.length, "건)", listOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
+  }, "\uBC30\uC1A1 \uB0B4\uC5ED (", dayRows.length, "\uAC74)", listOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
     size: 16
   }) : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 16
@@ -14765,14 +14849,14 @@ function DangaLookup() {
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setOpenRows(prev => new Set([...prev, ...dayRows.map(d => d.id)])),
     className: "underline text-slate-600"
-  }, "모두 펼치기"), /*#__PURE__*/React.createElement("button", {
+  }, "\uBAA8\uB450 \uD3BC\uCE58\uAE30"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setOpenRows(prev => new Set([...prev].filter(id => !dayRows.some(d => d.id === id)))),
     className: "underline text-slate-600"
-  }, "모두 접기"))), listOpen && /*#__PURE__*/React.createElement("div", {
+  }, "\uBAA8\uB450 \uC811\uAE30"))), listOpen && /*#__PURE__*/React.createElement("div", {
     className: "border-t border-slate-100 bg-slate-50 p-3 space-y-2"
   }, dayRows.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-400 py-4 text-center"
-  }, deliveryDate, "에 등록된 배송 건이 없어요. 아래 \"상품 선택해서 배송 건 추가\"에서 상품을 검색해 추가해주세요.") : dayRows.map((d, idx) => {
+  }, deliveryDate, "\uC5D0 \uB4F1\uB85D\uB41C \uBC30\uC1A1 \uAC74\uC774 \uC5C6\uC5B4\uC694. \uC544\uB798 \"\uC0C1\uD488 \uC120\uD0DD\uD574\uC11C \uBC30\uC1A1 \uAC74 \uCD94\uAC00\"\uC5D0\uC11C \uC0C1\uD488\uC744 \uAC80\uC0C9\uD574 \uCD94\uAC00\uD574\uC8FC\uC138\uC694.") : dayRows.map((d, idx) => {
     const open = openRows.has(d.id);
     const its = itemsOf(d);
     const flags = d.flags || {};
@@ -14807,16 +14891,9 @@ function DangaLookup() {
       className: "block text-sm truncate"
     }, its.length ? itemLabel(its[0]) : "상품 없음", its.length > 1 ? ` 외 ${its.length - 1}건` : "")), /*#__PURE__*/React.createElement("span", {
       className: "block text-xs text-slate-500 truncate"
-    }, [d.address, d.invoice].filter(Boolean).join(" · ") || "주소·송장 미입력"))), /*#__PURE__*/React.createElement("select", {
-      value: d.status,
-      onChange: e => updateDelivery(d.id, {
-        status: e.target.value
-      }),
-      className: `text-base font-semibold px-2 py-1 border border-slate-300 shrink-0 ${STATUS_STYLE[d.status] || ""}`
-    }, STATUS_LIST.map(st => /*#__PURE__*/React.createElement("option", {
-      key: st,
-      value: st
-    }, st)))), open && /*#__PURE__*/React.createElement("div", {
+    }, [d.address, d.invoice].filter(Boolean).join(" · ") || "주소·송장 미입력"))), /*#__PURE__*/React.createElement("span", {
+      className: `shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[d.status] || "bg-slate-100 text-slate-700"}`
+    }, d.status)), open && /*#__PURE__*/React.createElement("div", {
       className: "border-t border-slate-200 p-3 sm:p-4"
     }, /*#__PURE__*/React.createElement("div", {
       className: "flex flex-wrap items-center gap-3 mb-3"
@@ -14826,7 +14903,7 @@ function DangaLookup() {
       onChange: e => e.target.value && updateDelivery(d.id, {
         date: e.target.value
       }),
-      title: "배송일 (바꾸면 해당 날짜 목록으로 이동해요)",
+      title: "\uBC30\uC1A1\uC77C (\uBC14\uAFB8\uBA74 \uD574\uB2F9 \uB0A0\uC9DC \uBAA9\uB85D\uC73C\uB85C \uC774\uB3D9\uD574\uC694)",
       className: "border border-slate-300 px-2 py-1 text-base font-mono focus:outline-none focus:border-slate-900"
     }), FLAG_LIST.map(f => /*#__PURE__*/React.createElement("label", {
       key: f.key,
@@ -14841,7 +14918,7 @@ function DangaLookup() {
     }), confirmDeleteDeliveryId !== d.id ? /*#__PURE__*/React.createElement("button", {
       onClick: () => setConfirmDeleteDeliveryId(d.id),
       className: "p-2 text-slate-400 hover:text-red-600",
-      title: "삭제"
+      title: "\uC0AD\uC81C"
     }, /*#__PURE__*/React.createElement(Trash2, {
       size: 14
     })) : /*#__PURE__*/React.createElement("span", {
@@ -14849,14 +14926,14 @@ function DangaLookup() {
     }, /*#__PURE__*/React.createElement("button", {
       onClick: () => handleDeleteDelivery(d.id),
       className: "text-red-600 font-semibold hover:underline px-1"
-    }, "삭제"), /*#__PURE__*/React.createElement("button", {
+    }, "\uC0AD\uC81C"), /*#__PURE__*/React.createElement("button", {
       onClick: () => setConfirmDeleteDeliveryId(null),
       className: "text-slate-400 hover:underline px-1"
-    }, "취소"))), /*#__PURE__*/React.createElement("div", {
+    }, "\uCDE8\uC18C"))), /*#__PURE__*/React.createElement("div", {
       className: "flex flex-wrap items-center gap-2 mb-3"
     }, /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-500"
-    }, "시간"), ["AM", "PM"].map(tp => /*#__PURE__*/React.createElement("button", {
+    }, "\uC2DC\uAC04"), ["AM", "PM"].map(tp => /*#__PURE__*/React.createElement("button", {
       key: tp,
       onClick: () => updateDelivery(d.id, {
         timePeriod: d.timePeriod === tp ? "" : tp
@@ -14869,13 +14946,13 @@ function DangaLookup() {
       onChange: e => updateDelivery(d.id, {
         timeNote: e.target.value
       }),
-      placeholder: "시간 상세 (예: 10시 이후)",
-      "aria-label": "시간 상세",
+      placeholder: "\uC2DC\uAC04 \uC0C1\uC138 (\uC608: 10\uC2DC \uC774\uD6C4)",
+      "aria-label": "\uC2DC\uAC04 \uC0C1\uC138",
       className: "flex-1 basis-40 min-w-0 border border-slate-300 px-2 py-1 text-base focus:outline-none focus:border-slate-900"
     })), /*#__PURE__*/React.createElement("div", {
       className: "grid grid-cols-2 sm:grid-cols-4 gap-2"
     }, /*#__PURE__*/React.createElement(Field, {
-      label: "송장번호"
+      label: "\uC1A1\uC7A5\uBC88\uD638"
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
       value: d.invoice || "",
@@ -14884,7 +14961,7 @@ function DangaLookup() {
       }),
       className: inputCls + " font-mono"
     })), /*#__PURE__*/React.createElement(Field, {
-      label: "박스"
+      label: "\uBC15\uC2A4"
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
       value: d.box || "",
@@ -14893,7 +14970,7 @@ function DangaLookup() {
       }),
       className: inputCls
     })), /*#__PURE__*/React.createElement(Field, {
-      label: "주소",
+      label: "\uC8FC\uC18C",
       className: "col-span-2"
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
@@ -14903,7 +14980,7 @@ function DangaLookup() {
       }),
       className: inputCls
     })), /*#__PURE__*/React.createElement(Field, {
-      label: "메모",
+      label: "\uBA54\uBAA8",
       className: "col-span-2 sm:col-span-4"
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
@@ -14918,14 +14995,14 @@ function DangaLookup() {
       className: "flex items-center justify-between bg-slate-50 px-3 py-2"
     }, /*#__PURE__*/React.createElement("span", {
       className: "text-xs font-semibold text-slate-600"
-    }, "이 배송지의 상품 (", its.length, ")"), /*#__PURE__*/React.createElement("button", {
+    }, "\uC774 \uBC30\uC1A1\uC9C0\uC758 \uC0C1\uD488 (", its.length, ")"), /*#__PURE__*/React.createElement("button", {
       onClick: () => openPickerFor({
         stopId: d.id
       }),
       className: "flex items-center gap-1 text-xs font-semibold text-slate-700 border border-slate-300 bg-white px-2 py-1 hover:bg-slate-100"
     }, /*#__PURE__*/React.createElement(Plus, {
       size: 12
-    }), "상품 추가")), /*#__PURE__*/React.createElement("ul", {
+    }), "\uC0C1\uD488 \uCD94\uAC00")), /*#__PURE__*/React.createElement("ul", {
       className: "divide-y divide-slate-100"
     }, its.map(it => /*#__PURE__*/React.createElement("li", {
       key: it.id,
@@ -14939,12 +15016,25 @@ function DangaLookup() {
       onChange: e => updateItem(d.id, it.id, {
         name: e.target.value
       }),
-      placeholder: "상품명 (이전에 입력한 상품명이 추천돼요)",
-      title: "상품명 (직접 수정할 수 있어요)",
+      placeholder: "\uC0C1\uD488\uBA85 (\uC774\uC804\uC5D0 \uC785\uB825\uD55C \uC0C1\uD488\uBA85\uC774 \uCD94\uCC9C\uB3FC\uC694)",
+      title: "\uC0C1\uD488\uBA85 (\uC9C1\uC811 \uC218\uC815\uD560 \uC218 \uC788\uC5B4\uC694)",
       className: "flex-1 basis-48 min-w-0 border border-slate-300 px-2 py-1.5 text-base focus:outline-none focus:border-slate-900"
-    }), /*#__PURE__*/React.createElement("span", {
+    }), /*#__PURE__*/React.createElement("label", {
+      className: "flex items-center gap-1 text-xs text-slate-500 whitespace-nowrap"
+    }, "\uC218\uB7C9", /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "1",
+      step: "1",
+      inputMode: "numeric",
+      "aria-label": "\uC0C1\uD488 \uC218\uB7C9",
+      value: it.qty || 1,
+      onChange: e => updateItem(d.id, it.id, {
+        qty: Math.max(1, parseInt(e.target.value, 10) || 1)
+      }),
+      className: "w-16 border border-slate-300 px-1.5 py-1 text-base text-center focus:outline-none focus:border-slate-900"
+    })), /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-500 whitespace-nowrap"
-    }, formatPrice(it.price), MODE_LABEL[it.priceMode] ? /*#__PURE__*/React.createElement("span", {
+    }, formatPrice(it.price), " / \uAC1C \xB7 \uC18C\uACC4 ", formatPrice((Number(it.price) || 0) * (it.qty || 1)), MODE_LABEL[it.priceMode] ? /*#__PURE__*/React.createElement("span", {
       className: "text-slate-400"
     }, " (", MODE_LABEL[it.priceMode], ")") : null), /*#__PURE__*/React.createElement("button", {
       onClick: () => openPickerFor({
@@ -14952,10 +15042,10 @@ function DangaLookup() {
         itemId: it.id
       }),
       className: "text-xs text-slate-500 underline hover:text-slate-700"
-    }, "상품 변경"), its.length > 1 && /*#__PURE__*/React.createElement("button", {
+    }, "\uC0C1\uD488 \uBCC0\uACBD"), its.length > 1 && /*#__PURE__*/React.createElement("button", {
       onClick: () => removeItem(d.id, it.id),
       className: "p-1 text-slate-400 hover:text-red-600",
-      title: "이 상품 빼기"
+      title: "\uC774 \uC0C1\uD488 \uBE7C\uAE30"
     }, /*#__PURE__*/React.createElement(X, {
       size: 14
     }))))))));
@@ -14978,7 +15068,7 @@ function DangaLookup() {
     className: "px-4 pb-4 pt-3 border-t border-slate-100"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mb-2"
-  }, "상품명 일부를 검색하고 단가를 누르면 ", deliveryDate, " 배송 건이 추가돼요. 단가가 두 가지로 보이면 수수료", " ", feeRate, "% 제외 단가와 적용단가를 비교해서 하나를 골라요. 선택한 금액이 정산 페이지의 상품 단가로 들어가요. (수수료율은 단가 조회 탭에서 바꿀 수 있어요)"), /*#__PURE__*/React.createElement("div", {
+  }, "\uC0C1\uD488\uC744 \uAC80\uC0C9\uD558\uACE0 \uC218\uC218\uB8CC \uC81C\uC678 \uB2E8\uAC00 \uB610\uB294 \uC801\uC6A9\uB2E8\uAC00\uB97C \uC120\uD0DD\uD558\uBA74 ", deliveryDate, " \uBC30\uC1A1\uC5D0 \uCD94\uAC00\uB3FC\uC694. \uC218\uC218\uB8CC\uC728\uC740 \uB2E8\uAC00 \uC870\uD68C\uC5D0\uC11C \uBCC0\uACBD\uD560 \uC218 \uC788\uC5B4\uC694."), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement(Search, {
     className: "absolute left-3 top-1/2 -translate-y-1/2 text-slate-400",
@@ -14990,7 +15080,7 @@ function DangaLookup() {
       setPickQuery(e.target.value);
       setPickLimit(40);
     },
-    placeholder: "예: 이즈 카이",
+    placeholder: "\uC608: \uC774\uC988 \uCE74\uC774",
     className: "w-full border-2 border-slate-900 pl-9 pr-3 py-2 text-base focus:outline-none focus:border-amber-500"
   })), pickTarget && /*#__PURE__*/React.createElement("div", {
     className: "mt-2 flex items-center gap-2 text-xs"
@@ -14999,11 +15089,11 @@ function DangaLookup() {
   }, pickTarget.itemId ? "선택한 상품을 바꾸는 중이에요." : "선택한 배송지에 상품을 추가하는 중이에요."), /*#__PURE__*/React.createElement("button", {
     onClick: () => setPickTarget(null),
     className: "underline text-slate-500"
-  }, "취소")), pickQuery.trim() && (pickGroups.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, "\uCDE8\uC18C")), pickQuery.trim() && (pickGroups.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-500 mt-3"
-  }, "일치하는 상품이 없어요.") : /*#__PURE__*/React.createElement(React.Fragment, null, pickPartial && /*#__PURE__*/React.createElement("p", {
+  }, "\uC77C\uCE58\uD558\uB294 \uC0C1\uD488\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement(React.Fragment, null, pickPartial && /*#__PURE__*/React.createElement("p", {
     className: "mt-3 text-xs text-amber-700"
-  }, "검색어를 모두 포함한 상품이 없어서, 일부만 일치하는 상품을 보여줘요."), /*#__PURE__*/React.createElement("div", {
+  }, "\uAC80\uC0C9\uC5B4\uB97C \uBAA8\uB450 \uD3EC\uD568\uD55C \uC0C1\uD488\uC774 \uC5C6\uC5B4\uC11C, \uC77C\uBD80\uB9CC \uC77C\uCE58\uD558\uB294 \uC0C1\uD488\uC744 \uBCF4\uC5EC\uC918\uC694."), /*#__PURE__*/React.createElement("div", {
     className: "mt-3 border border-slate-200 divide-y divide-slate-200 max-h-80 overflow-y-auto"
   }, pickGroups.map(g => /*#__PURE__*/React.createElement("div", {
     key: g.name,
@@ -15028,31 +15118,31 @@ function DangaLookup() {
       className: `text-xs font-semibold px-2 py-0.5 rounded-sm ${reasonStyle(rg.reason)}`
     }, rg.reason), hasNet && /*#__PURE__*/React.createElement("button", {
       onClick: () => pickProduct(cur, "net"),
-      title: "수수료 제외 단가로 선택",
+      title: "\uC218\uC218\uB8CC \uC81C\uC678 \uB2E8\uAC00\uB85C \uC120\uD0DD",
       className: "flex flex-col items-end leading-tight border border-blue-200 bg-white hover:bg-blue-50 px-2 py-0.5"
     }, /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, "수수료 ", feeRate, "% 제외"), /*#__PURE__*/React.createElement("span", {
+    }, "\uC218\uC218\uB8CC ", feeRate, "% \uC81C\uC678"), /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-blue-700 font-semibold text-sm"
     }, formatPrice(netVal))), hasApp && /*#__PURE__*/React.createElement("button", {
       onClick: () => pickProduct(cur, "applied"),
-      title: "적용단가로 선택",
+      title: "\uC801\uC6A9\uB2E8\uAC00\uB85C \uC120\uD0DD",
       className: "flex flex-col items-end leading-tight border border-purple-200 bg-white hover:bg-purple-50 px-2 py-0.5"
     }, /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, "적용단가"), /*#__PURE__*/React.createElement("span", {
+    }, "\uC801\uC6A9\uB2E8\uAC00"), /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-purple-700 font-semibold text-sm"
     }, formatPrice(cur.applied))), hasNet && hasApp && diff !== 0 && /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, "적용단가가 ", formatPrice(Math.abs(diff)), " ", diff > 0 ? "높아요" : "낮아요"), !hasNet && !hasApp && /*#__PURE__*/React.createElement("span", {
+    }, "\uC801\uC6A9\uB2E8\uAC00\uAC00 ", formatPrice(Math.abs(diff)), " ", diff > 0 ? "높아요" : "낮아요"), !hasNet && !hasApp && /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, "단가 없음"));
+    }, "\uB2E8\uAC00 \uC5C6\uC74C"));
   }))))), /*#__PURE__*/React.createElement("div", {
     className: "mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500"
-  }, /*#__PURE__*/React.createElement("span", null, "단가 조회의 전체 상품에서 검색해요 · 결과 ", pickAllGroups.length, "개 중 ", pickGroups.length, "개 표시"), pickAllGroups.length > pickGroups.length && /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("span", null, "\uB2E8\uAC00 \uC870\uD68C\uC758 \uC804\uCCB4 \uC0C1\uD488\uC5D0\uC11C \uAC80\uC0C9\uD574\uC694 \xB7 \uACB0\uACFC ", pickAllGroups.length, "\uAC1C \uC911 ", pickGroups.length, "\uAC1C \uD45C\uC2DC"), pickAllGroups.length > pickGroups.length && /*#__PURE__*/React.createElement("button", {
     onClick: () => setPickLimit(n => n + 40),
     className: "underline font-semibold text-slate-700"
-  }, "더 보기 (+40)")))))));
+  }, "\uB354 \uBCF4\uAE30 (+40)")))))));
   const settleSel = useMemo(() => dayRows.filter(isSettleSel), [dayRows]);
   const settleSummary = useMemo(() => {
     const t = {
@@ -15088,6 +15178,38 @@ function DangaLookup() {
       total: items.reduce((sum, d) => sum + deliveryTotal(d), 0)
     })).sort((x, y) => x.date < y.date ? 1 : -1);
   }, [deliveries]);
+  const recordsByDate = useMemo(() => new Map(deliveryRecords.map(r => [r.date, r])), [deliveryRecords]);
+  const recordsYear = Number(recordsDate.slice(0, 4));
+  const recordsMonth = Number(recordsDate.slice(5, 7));
+  const recordsMonthPrefix = recordsDate.slice(0, 7);
+  const recordsYearPrefix = recordsDate.slice(0, 4);
+  const dailyRecord = recordsByDate.get(recordsDate);
+  const monthlyRecords = useMemo(() => deliveryRecords.filter(r => r.date.startsWith(recordsMonthPrefix)), [deliveryRecords, recordsMonthPrefix]);
+  const yearlyRecords = useMemo(() => deliveryRecords.filter(r => r.date.startsWith(recordsYearPrefix)), [deliveryRecords, recordsYearPrefix]);
+  const annualMonths = useMemo(() => Array.from({
+    length: 12
+  }, (_, i) => {
+    const prefix = `${recordsYearPrefix}-${String(i + 1).padStart(2, "0")}`;
+    const rows = deliveryRecords.filter(r => r.date.startsWith(prefix));
+    return {
+      month: i + 1,
+      prefix,
+      days: rows.length,
+      count: rows.reduce((sum, r) => sum + r.count, 0),
+      total: rows.reduce((sum, r) => sum + r.total, 0)
+    };
+  }), [deliveryRecords, recordsYearPrefix]);
+  const calendarCells = useMemo(() => {
+    const first = new Date(recordsYear, recordsMonth - 1, 1);
+    const offset = first.getDay();
+    const count = new Date(recordsYear, recordsMonth, 0).getDate();
+    return [...Array(offset).fill(null), ...Array.from({
+      length: count
+    }, (_, i) => dateInputStr(new Date(recordsYear, recordsMonth - 1, i + 1)))];
+  }, [recordsYear, recordsMonth]);
+  const recordsDayRows = useMemo(() => deliveries.filter(d => d.date === recordsDate), [deliveries, recordsDate]);
+  const recordsMonthRows = useMemo(() => deliveries.filter(d => String(d.date || "").startsWith(recordsMonthPrefix)), [deliveries, recordsMonthPrefix]);
+  const recordsYearRows = useMemo(() => deliveries.filter(d => String(d.date || "").startsWith(recordsYearPrefix)), [deliveries, recordsYearPrefix]);
   function toggleSettle(d) {
     updateDelivery(d.id, {
       settle: !isSettleSel(d)
@@ -15116,22 +15238,42 @@ function DangaLookup() {
       setExportMsg("엑셀 파일을 만들지 못했어요. 배포된 사이트에서 다시 시도해주세요.");
     }
   }
-  function exportSelectedExcel() {
+  function exportDayExcel() {
+    const rows = [...dayRows].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, buildSettleSheet(settleSel, `정산서 · ${deliveryDate} (선택 ${settleSel.length}건)`), "정산서");
-    downloadWorkbook(wb, `정산서_${deliveryDate}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, `배송 내역 · ${deliveryDate} (전체 ${rows.length}건)`), "배송내역");
+    downloadWorkbook(wb, `배송내역_${deliveryDate}.xlsx`);
   }
   function exportAllExcel() {
-    const rows = deliveries.filter(isSettleSel).sort((x, y) => x.date.localeCompare(y.date));
-    const title = rows.length ? `정산서 · 전체 (${rows[0].date} ~ ${rows[rows.length - 1].date}, ${rows.length}건)` : "정산서 · 전체";
+    const rows = [...deliveries].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    const title = rows.length ? `배송 내역 · 전체 (${rows[0].date} ~ ${rows[rows.length - 1].date}, ${rows.length}건)` : "배송 내역 · 전체";
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, title), "정산서");
-    downloadWorkbook(wb, `정산서_전체_${todayStr().replace(/-/g, "")}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, title), "배송내역");
+    downloadWorkbook(wb, `배송내역_전체_${todayStr().replace(/-/g, "")}.xlsx`);
+  }
+  function shiftRecordsCursor(delta) {
+    const d = new Date(`${recordsDate}T12:00:00`);
+    if (recordsMode === "day") d.setDate(d.getDate() + delta);else if (recordsMode === "month") {
+      d.setDate(1);
+      d.setMonth(d.getMonth() + delta);
+    } else d.setFullYear(d.getFullYear() + delta);
+    const next = dateInputStr(d);
+    setRecordsDate(next);
+    setDeliveryDate(next);
+  }
+  function exportRecordsPeriod(period) {
+    const key = period === "day" ? recordsDate : period === "month" ? recordsMonthPrefix : recordsYearPrefix;
+    const rows = deliveries.filter(d => period === "day" ? d.date === key : String(d.date || "").startsWith(key)).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    if (!rows.length) return;
+    const title = `배송 내역 · ${period === "day" ? key : period === "month" ? `${key}월` : `${key}년`} (전체 ${rows.length}건)`;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, buildSettleSheet(rows, title), "배송내역");
+    downloadWorkbook(wb, `배송내역_${key}.xlsx`);
   }
   const headTexts = {
     lookup: ["가구 배송 단가 조회", "상품명 또는 키워드를 입력하면 단가를 보여드려요", "같은 상품도 재출고·프로모션·내림서비스 등 사유별로 단가가 다르면 전부 따로 보여줘요."],
-    delivery: ["일별 배송 리스트", "날짜별로 배송 건을 정리하고 프린트해요", "배송지마다 상품을 여러 개 추가할 수 있어요. 상태·송장번호·주소·메모를 입력하고, 단가와 비용은 정산 페이지에서 정리해요."],
-    settle: ["정산 페이지", "배송 건을 체크해 정산서를 미리 보고 프린트·엑셀로 받아요", "상품별 단가를 고칠 수 있고, 설치비는 단가 합계로 계산돼요. 체크한 건은 아래 정산 기록에 날짜별로 쌓여요."]
+    delivery: ["일별 배송 리스트", "날짜별로 배송 건을 정리하고 프린트해요", "배송지마다 상품과 수량을 관리하고, 배송 상태는 정산 페이지에서 선택할 수 있어요."],
+    settle: ["정산 페이지", "배송 건을 체크해 정산서를 미리 보고 프린트·엑셀로 받아요", "상품별 단가와 수량을 수정하고, 정산 기록을 달력에서 일·월·년 단위로 확인하고 엑셀로 내려받을 수 있어요."]
   };
   const printView = /*#__PURE__*/React.createElement("div", {
     className: "print-only"
@@ -15142,9 +15284,9 @@ function DangaLookup() {
       fontWeight: 700,
       marginBottom: 6
     }
-  }, "정산서 · ", deliveryDate, " (선택 ", settleSel.length, "건)"), /*#__PURE__*/React.createElement("table", {
+  }, "\uC815\uC0B0\uC11C \xB7 ", deliveryDate, " (\uC120\uD0DD ", settleSel.length, "\uAC74)"), /*#__PURE__*/React.createElement("table", {
     className: "print-table settle-table"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "구분"), /*#__PURE__*/React.createElement("th", null, "상태"), /*#__PURE__*/React.createElement("th", null, "배송일"), /*#__PURE__*/React.createElement("th", null, "송장번호"), /*#__PURE__*/React.createElement("th", null, "박스"), /*#__PURE__*/React.createElement("th", null, "상품명"), /*#__PURE__*/React.createElement("th", null, "주소"), /*#__PURE__*/React.createElement("th", null, "메모"), /*#__PURE__*/React.createElement("th", null, "설치비"), /*#__PURE__*/React.createElement("th", null, "양중비"), /*#__PURE__*/React.createElement("th", null, "내림비"), /*#__PURE__*/React.createElement("th", null, "기타비용"), /*#__PURE__*/React.createElement("th", null, "합계"))), /*#__PURE__*/React.createElement("tbody", null, settleSel.flatMap(d => {
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "\uAD6C\uBD84"), /*#__PURE__*/React.createElement("th", null, "\uC0C1\uD0DC"), /*#__PURE__*/React.createElement("th", null, "\uBC30\uC1A1\uC77C"), /*#__PURE__*/React.createElement("th", null, "\uC1A1\uC7A5\uBC88\uD638"), /*#__PURE__*/React.createElement("th", null, "\uBC15\uC2A4"), /*#__PURE__*/React.createElement("th", null, "\uC0C1\uD488\uBA85"), /*#__PURE__*/React.createElement("th", null, "\uC218\uB7C9"), /*#__PURE__*/React.createElement("th", null, "\uC8FC\uC18C"), /*#__PURE__*/React.createElement("th", null, "\uBA54\uBAA8"), /*#__PURE__*/React.createElement("th", null, "\uC124\uCE58\uBE44"), /*#__PURE__*/React.createElement("th", null, "\uC591\uC911\uBE44"), /*#__PURE__*/React.createElement("th", null, "\uB0B4\uB9BC\uBE44"), /*#__PURE__*/React.createElement("th", null, "\uAE30\uD0C0\uBE44\uC6A9"), /*#__PURE__*/React.createElement("th", null, "\uD569\uACC4"))), /*#__PURE__*/React.createElement("tbody", null, settleSel.flatMap(d => {
     const its = itemsOf(d);
     const lines = its.length ? its : [null];
     return lines.map((it, k) => /*#__PURE__*/React.createElement("tr", {
@@ -15153,12 +15295,14 @@ function DangaLookup() {
       d: d
     }) : null), /*#__PURE__*/React.createElement("td", null, k === 0 ? d.status : null), /*#__PURE__*/React.createElement("td", null, k === 0 ? shortDate(d.date) : null), /*#__PURE__*/React.createElement("td", null, k === 0 ? d.invoice : null), /*#__PURE__*/React.createElement("td", null, k === 0 ? d.box : null), /*#__PURE__*/React.createElement("td", {
       className: "left"
-    }, it ? itemLabel(it) : ""), k === 0 && /*#__PURE__*/React.createElement("td", {
+    }, it ? itemLabel(it) : ""), /*#__PURE__*/React.createElement("td", {
+      className: "num"
+    }, it ? fmtNum(it.qty || 1) : "1"), k === 0 && /*#__PURE__*/React.createElement("td", {
       className: "left",
       rowSpan: lines.length
     }, d.address), /*#__PURE__*/React.createElement("td", null, k === 0 ? d.memo : null), /*#__PURE__*/React.createElement("td", {
       className: "num"
-    }, fmtNum(it ? it.price : k === 0 ? d.install : 0)), /*#__PURE__*/React.createElement("td", {
+    }, fmtNum(it ? it.price * (it.qty || 1) : k === 0 ? d.install : 0)), /*#__PURE__*/React.createElement("td", {
       className: "num"
     }, k === 0 ? fmtNum(d.lift) : null), /*#__PURE__*/React.createElement("td", {
       className: "num"
@@ -15168,8 +15312,8 @@ function DangaLookup() {
       className: "num"
     }, k === 0 ? fmtNum(deliveryTotal(d)) : null)));
   })), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
-    colSpan: 8
-  }, "선택 ", settleSel.length, "건 합계"), /*#__PURE__*/React.createElement("td", {
+    colSpan: 9
+  }, "\uC120\uD0DD ", settleSel.length, "\uAC74 \uD569\uACC4"), /*#__PURE__*/React.createElement("td", {
     className: "num"
   }, fmtNum(settleSummary.install)), /*#__PURE__*/React.createElement("td", {
     className: "num"
@@ -15188,7 +15332,7 @@ function DangaLookup() {
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setDeliveryDate(shiftDate(deliveryDate, -1)),
     className: "px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100"
-  }, "◀ 전날"), /*#__PURE__*/React.createElement("input", {
+  }, "\u25C0 \uC804\uB0A0"), /*#__PURE__*/React.createElement("input", {
     type: "date",
     value: deliveryDate,
     onChange: e => e.target.value && setDeliveryDate(e.target.value),
@@ -15196,31 +15340,31 @@ function DangaLookup() {
   }), /*#__PURE__*/React.createElement("button", {
     onClick: () => setDeliveryDate(shiftDate(deliveryDate, 1)),
     className: "px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100"
-  }, "다음날 ▶"), /*#__PURE__*/React.createElement("button", {
+  }, "\uB2E4\uC74C\uB0A0 \u25B6"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setDeliveryDate(todayStr()),
     className: "px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100"
-  }, "오늘"), /*#__PURE__*/React.createElement("div", {
+  }, "\uC624\uB298"), /*#__PURE__*/React.createElement("div", {
     className: "flex-1"
   }), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowSettlePreview(v => !v),
     disabled: settleSel.length === 0,
     className: "px-4 py-2 border-2 border-slate-900 bg-white text-sm font-semibold hover:bg-slate-100 disabled:opacity-40"
   }, showSettlePreview ? "미리보기 닫기" : "미리보기"), /*#__PURE__*/React.createElement("button", {
-    onClick: exportSelectedExcel,
-    disabled: settleSel.length === 0,
-    title: "체크한 건을 미리보기와 같은 표로 엑셀 다운로드",
+    onClick: exportDayExcel,
+    disabled: dayRows.length === 0,
+    title: "\uC120\uD0DD\uD55C \uB0A0\uC9DC\uC758 \uC644\uB8CC\xB7\uC5F0\uAE30\xB7\uCDE8\uC18C \uBC30\uC1A1 \uAC74\uC744 \uBAA8\uB450 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC",
     className: "flex items-center gap-1 px-4 py-2 border-2 border-slate-900 bg-white text-sm font-semibold hover:bg-slate-100 disabled:opacity-40"
   }, /*#__PURE__*/React.createElement(Download, {
     size: 16
-  }), "엑셀 (선택 건)"), /*#__PURE__*/React.createElement("button", {
+  }), "\uC5D1\uC140 (\uB2F9\uC77C \uC804\uCCB4)"), /*#__PURE__*/React.createElement("button", {
     onClick: () => window.print(),
     disabled: settleSel.length === 0,
     className: "flex items-center gap-1 bg-slate-900 text-white font-semibold text-sm px-4 py-2 hover:bg-slate-800 disabled:opacity-40"
   }, /*#__PURE__*/React.createElement(Printer, {
     size: 16
-  }), "프린트")), /*#__PURE__*/React.createElement("p", {
+  }), "\uD504\uB9B0\uD2B8")), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mt-2"
-  }, deliveryDate, " · 배송 ", dayRows.length, "건 중 ", /*#__PURE__*/React.createElement("b", null, settleSel.length, "건 선택"), " · 선택 합계", " ", /*#__PURE__*/React.createElement("b", {
+  }, deliveryDate, " \xB7 \uBC30\uC1A1 ", dayRows.length, "\uAC74 \uC911 ", /*#__PURE__*/React.createElement("b", null, settleSel.length, "\uAC74 \uC120\uD0DD"), " \xB7 \uC120\uD0DD \uD569\uACC4", " ", /*#__PURE__*/React.createElement("b", {
     className: "text-emerald-700"
   }, formatPrice(settleSummary.total))), exportMsg && /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-red-600 mt-1"
@@ -15230,10 +15374,10 @@ function DangaLookup() {
     className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-sm font-semibold"
-  }, "정산서 미리보기 (인쇄 모양 그대로)"), /*#__PURE__*/React.createElement("button", {
+  }, "\uC815\uC0B0\uC11C \uBBF8\uB9AC\uBCF4\uAE30 (\uC778\uC1C4 \uBAA8\uC591 \uADF8\uB300\uB85C)"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowSettlePreview(false),
     className: "text-xs text-slate-500 underline"
-  }, "닫기")), /*#__PURE__*/React.createElement("div", {
+  }, "\uB2EB\uAE30")), /*#__PURE__*/React.createElement("div", {
     className: "overflow-x-auto"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -15247,7 +15391,7 @@ function DangaLookup() {
     onClick: () => setSettleListOpen(v => !v),
     "aria-expanded": settleListOpen,
     className: "flex flex-1 items-center gap-2 text-left text-sm font-semibold"
-  }, "정산 대상 배송 내역 (", dayRows.length, "건)", settleListOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
+  }, "\uC815\uC0B0 \uB300\uC0C1 \uBC30\uC1A1 \uB0B4\uC5ED (", dayRows.length, "\uAC74)", settleListOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
     size: 16
   }) : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 16
@@ -15256,24 +15400,24 @@ function DangaLookup() {
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setSettleOpenRows(prev => new Set([...prev, ...dayRows.map(d => d.id)])),
     className: "underline text-slate-600"
-  }, "모두 펼치기"), /*#__PURE__*/React.createElement("button", {
+  }, "\uBAA8\uB450 \uD3BC\uCE58\uAE30"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setSettleOpenRows(prev => new Set([...prev].filter(id => !dayRows.some(d => d.id === id)))),
     className: "underline text-slate-600"
-  }, "모두 접기"))), settleListOpen && /*#__PURE__*/React.createElement("div", {
+  }, "\uBAA8\uB450 \uC811\uAE30"))), settleListOpen && /*#__PURE__*/React.createElement("div", {
     className: "border-t border-slate-100 bg-slate-50 p-3 space-y-2"
   }, dayRows.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap items-center gap-3 text-xs pb-1"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setAllSettle(true),
     className: "underline text-slate-600"
-  }, "전체 선택"), /*#__PURE__*/React.createElement("button", {
+  }, "\uC804\uCCB4 \uC120\uD0DD"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setAllSettle(false),
     className: "underline text-slate-600"
-  }, "전체 해제"), /*#__PURE__*/React.createElement("span", {
+  }, "\uC804\uCCB4 \uD574\uC81C"), /*#__PURE__*/React.createElement("span", {
     className: "text-slate-400"
-  }, "처음에는 완료 건만 체크돼 있어요. 체크한 건이 정산 기록에 쌓여요.")), dayRows.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, "\uCC98\uC74C\uC5D0\uB294 \uC644\uB8CC \uAC74\uB9CC \uCCB4\uD06C\uB3FC \uC788\uC5B4\uC694. \uCCB4\uD06C\uD55C \uAC74\uC774 \uC815\uC0B0 \uAE30\uB85D\uC5D0 \uC313\uC5EC\uC694.")), dayRows.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-400 py-4 text-center"
-  }, deliveryDate, "에 배송 건이 없어요. 「배송 리스트」 탭에서 먼저 추가해주세요.") : dayRows.map((d, idx) => {
+  }, deliveryDate, "\uC5D0 \uBC30\uC1A1 \uAC74\uC774 \uC5C6\uC5B4\uC694. \u300C\uBC30\uC1A1 \uB9AC\uC2A4\uD2B8\u300D \uD0ED\uC5D0\uC11C \uBA3C\uC800 \uCD94\uAC00\uD574\uC8FC\uC138\uC694.") : dayRows.map((d, idx) => {
     const sel = isSettleSel(d);
     const open = settleOpenRows.has(d.id);
     return /*#__PURE__*/React.createElement("div", {
@@ -15286,7 +15430,7 @@ function DangaLookup() {
       checked: sel,
       onChange: () => toggleSettle(d),
       className: "w-5 h-5 shrink-0",
-      title: "정산서·정산 기록에 포함"
+      title: "\uC815\uC0B0\uC11C\xB7\uC815\uC0B0 \uAE30\uB85D\uC5D0 \uD3EC\uD568"
     }), /*#__PURE__*/React.createElement("button", {
       onClick: () => toggleSettleRow(d.id),
       "aria-expanded": open,
@@ -15314,7 +15458,17 @@ function DangaLookup() {
       className: "block text-sm truncate"
     }, itemsOf(d).length ? itemLabel(itemsOf(d)[0]) : d.productName, itemsOf(d).length > 1 ? ` 외 ${itemsOf(d).length - 1}건` : "")), /*#__PURE__*/React.createElement("span", {
       className: "block text-xs text-slate-500 truncate"
-    }, d.address || "주소 미입력"))), /*#__PURE__*/React.createElement("span", {
+    }, d.address || "주소 미입력"))), /*#__PURE__*/React.createElement("select", {
+      value: d.status,
+      onChange: e => updateDelivery(d.id, {
+        status: e.target.value
+      }),
+      "aria-label": "\uBC30\uC1A1 \uC0C1\uD0DC",
+      className: `shrink-0 border px-2 py-1.5 text-xs font-semibold ${STATUS_STYLE[d.status] || "bg-slate-100 text-slate-700"}`
+    }, STATUS_LIST.map(st => /*#__PURE__*/React.createElement("option", {
+      key: st,
+      value: st
+    }, st))), /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-emerald-700 font-semibold text-sm whitespace-nowrap"
     }, formatPrice(deliveryTotal(d)))), open && /*#__PURE__*/React.createElement("div", {
       className: "border-t border-slate-200 p-3 sm:p-4"
@@ -15322,7 +15476,7 @@ function DangaLookup() {
       className: "mb-3 border border-slate-200"
     }, /*#__PURE__*/React.createElement("p", {
       className: "bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600"
-    }, "상품별 단가 (수정할 수 있어요)"), /*#__PURE__*/React.createElement("ul", {
+    }, "\uC0C1\uD488\uBCC4 \uB2E8\uAC00 (\uC218\uC815\uD560 \uC218 \uC788\uC5B4\uC694)"), /*#__PURE__*/React.createElement("ul", {
       className: "divide-y divide-slate-100"
     }, itemsOf(d).map(it => /*#__PURE__*/React.createElement("li", {
       key: it.id,
@@ -15333,10 +15487,23 @@ function DangaLookup() {
       className: "flex-1 basis-48 min-w-0 text-sm break-words"
     }, it.name), MODE_LABEL[it.priceMode] && /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, MODE_LABEL[it.priceMode]), /*#__PURE__*/React.createElement("input", {
+    }, MODE_LABEL[it.priceMode]), /*#__PURE__*/React.createElement("label", {
+      className: "flex items-center gap-1 text-xs text-slate-500 whitespace-nowrap"
+    }, "\uC218\uB7C9", /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "1",
+      step: "1",
+      inputMode: "numeric",
+      "aria-label": "\uC0C1\uD488 \uC218\uB7C9",
+      value: it.qty || 1,
+      onChange: e => updateItem(d.id, it.id, {
+        qty: Math.max(1, parseInt(e.target.value, 10) || 1)
+      }),
+      className: "w-16 border border-slate-300 px-1.5 py-1 text-base text-center focus:outline-none focus:border-slate-900"
+    })), /*#__PURE__*/React.createElement("input", {
       type: "text",
       inputMode: "numeric",
-      "aria-label": "단가",
+      "aria-label": "\uB2E8\uAC00",
       value: fmtNum(it.price),
       onChange: e => updateItem(d.id, it.id, {
         price: toNum(e.target.value),
@@ -15347,11 +15514,11 @@ function DangaLookup() {
     }))))), /*#__PURE__*/React.createElement("div", {
       className: "grid grid-cols-2 sm:grid-cols-5 gap-2"
     }, /*#__PURE__*/React.createElement(Field, {
-      label: "설치비 (단가 합계)"
+      label: "\uC124\uCE58\uBE44 (\uB2E8\uAC00 \uD569\uACC4)"
     }, /*#__PURE__*/React.createElement("div", {
       className: "w-full border border-slate-200 bg-slate-50 px-2 py-1.5 text-base font-mono text-right text-slate-700"
     }, formatPrice(d.install))), /*#__PURE__*/React.createElement(Field, {
-      label: "양중비"
+      label: "\uC591\uC911\uBE44"
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
       inputMode: "numeric",
@@ -15362,7 +15529,7 @@ function DangaLookup() {
       placeholder: "0",
       className: moneyCls
     })), /*#__PURE__*/React.createElement(Field, {
-      label: "내림비"
+      label: "\uB0B4\uB9BC\uBE44"
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
       inputMode: "numeric",
@@ -15373,7 +15540,7 @@ function DangaLookup() {
       placeholder: "0",
       className: moneyCls
     })), /*#__PURE__*/React.createElement(Field, {
-      label: "기타비용"
+      label: "\uAE30\uD0C0\uBE44\uC6A9"
     }, /*#__PURE__*/React.createElement("input", {
       type: "text",
       inputMode: "numeric",
@@ -15384,102 +15551,243 @@ function DangaLookup() {
       placeholder: "0",
       className: moneyCls
     })), /*#__PURE__*/React.createElement(Field, {
-      label: "합계",
+      label: "\uD569\uACC4",
       className: "col-span-2 sm:col-span-1"
     }, /*#__PURE__*/React.createElement("div", {
       className: "w-full border border-slate-200 bg-slate-50 px-2 py-1.5 text-base font-mono text-right font-bold text-emerald-700"
     }, formatPrice(deliveryTotal(d)))))));
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "mt-6 bg-white border border-slate-200"
+  }))), /*#__PURE__*/React.createElement("section", {
+    className: "mt-6 bg-white border border-slate-200 overflow-hidden"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 px-4 py-3"
+    className: "flex flex-wrap items-center gap-3 px-4 py-3"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setRecordsOpen(v => !v),
     "aria-expanded": recordsOpen,
     className: "flex flex-1 min-w-0 flex-wrap items-center gap-2 text-left text-sm font-semibold text-slate-700 hover:text-slate-900"
   }, /*#__PURE__*/React.createElement(CalendarDays, {
-    size: 16
-  }), "정산 기록", /*#__PURE__*/React.createElement("span", {
+    size: 17
+  }), /*#__PURE__*/React.createElement("span", null, "\uC815\uC0B0 \uAE30\uB85D"), /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-normal text-slate-400"
-  }, "체크한 배송 건 ", deliveryRecords.length, "일"), recordsOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
+  }, "\uC120\uD0DD\uB41C \uBC30\uC1A1 ", deliveryRecords.reduce((sum, r) => sum + r.count, 0), "\uAC74 \xB7 ", deliveryRecords.length, "\uC77C"), recordsOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
     size: 16
   }) : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 16
-  })), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold " + (syncStatus === "supabase" ? "bg-emerald-50 text-emerald-700" : syncStatus === "saving" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-600"),
+    title: "\uBC30\uC1A1\xB7\uC0C1\uD488 \uC815\uBCF4\uB294 \uBCC0\uACBD\uD560 \uB54C\uB9C8\uB2E4 \uC790\uB3D9 \uC800\uC7A5\uB418\uACE0 Supabase\uC640 \uB3D9\uAE30\uD654\uB429\uB2C8\uB2E4."
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "h-1.5 w-1.5 rounded-full " + (syncStatus === "supabase" ? "bg-emerald-500" : syncStatus === "saving" ? "bg-amber-500" : "bg-slate-400")
+  }), syncStatus === "supabase" ? "Supabase 저장" : syncStatus === "saving" ? "저장 중" : syncStatus === "connecting" ? "연결 중" : "브라우저 저장"), /*#__PURE__*/React.createElement("button", {
     onClick: exportAllExcel,
-    title: "체크된 모든 정산 건을 미리보기와 같은 표로 엑셀 다운로드",
-    className: "flex items-center gap-1 shrink-0 px-3 py-1.5 border-2 border-slate-900 bg-white text-xs sm:text-sm font-semibold hover:bg-slate-100"
+    title: "\uC644\uB8CC\xB7\uC5F0\uAE30\xB7\uCDE8\uC18C\uB97C \uD3EC\uD568\uD55C \uC804\uCCB4 \uBC30\uC1A1 \uB0B4\uC5ED \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC",
+    className: "flex items-center gap-1 shrink-0 px-3 py-1.5 border border-slate-300 bg-white text-xs sm:text-sm font-semibold hover:bg-slate-100"
   }, /*#__PURE__*/React.createElement(Download, {
     size: 14
-  }), "전체 엑셀 다운로드")), recordsOpen && /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100"
+  }), " \uC804\uCCB4 \uC5D1\uC140")), recordsOpen && /*#__PURE__*/React.createElement("div", {
+    className: "border-t border-slate-100 p-4 sm:p-5"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-3"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-semibold text-slate-500 mb-2"
-  }, "배송 정산 · 정산 페이지에서 체크한 건 (", deliveryRecords.length, "일)"), deliveryRecords.length === 0 ? /*#__PURE__*/React.createElement("p", {
-    className: "text-sm text-slate-400 py-3"
-  }, "체크된 정산 건이 없어요. 위에서 배송 건을 체크하면 날짜별로 여기 쌓여요.") : /*#__PURE__*/React.createElement("div", {
-    className: "border border-slate-200 divide-y divide-slate-100"
-  }, deliveryRecords.map(r => /*#__PURE__*/React.createElement("div", {
-    key: r.date
+    className: "flex flex-wrap items-center gap-2"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-slate-50",
-    onClick: () => setExpandedSettleDate(x => x === r.date ? null : r.date)
+    className: "inline-flex rounded-xl bg-slate-100 p-1"
+  }, [['day', '일별'], ['month', '월별'], ['year', '연별']].map(([mode, label]) => /*#__PURE__*/React.createElement("button", {
+    key: mode,
+    onClick: () => setRecordsMode(mode),
+    "aria-pressed": recordsMode === mode,
+    className: "px-3 py-1.5 text-sm font-semibold " + (recordsMode === mode ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800")
+  }, label))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1"
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: () => shiftRecordsCursor(-1),
+    className: "px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100",
+    "aria-label": "\uC774\uC804 \uAE30\uAC04"
+  }, "\u25C0"), /*#__PURE__*/React.createElement("strong", {
+    className: "min-w-28 text-center text-sm sm:text-base text-slate-800"
+  }, recordsMode === "day" ? recordsDate : recordsMode === "month" ? recordsYear + "년 " + String(recordsMonth).padStart(2, "0") + "월" : recordsYear + "년"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => shiftRecordsCursor(1),
+    className: "px-3 py-2 border border-slate-300 bg-white text-sm hover:bg-slate-100",
+    "aria-label": "\uB2E4\uC74C \uAE30\uAC04"
+  }, "\u25B6"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const d = todayStr();
+      setRecordsDate(d);
+      setDeliveryDate(d);
+    },
+    className: "px-3 py-2 border border-slate-300 bg-white text-sm font-semibold hover:bg-slate-100"
+  }, "\uC624\uB298")), recordsMode === "month" && /*#__PURE__*/React.createElement("div", {
+    className: "mt-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50 px-4 py-3"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "text-sm font-semibold w-28 shrink-0"
-  }, r.date), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs text-slate-500 flex-1"
-  }, r.count, "건"), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-emerald-700 font-semibold text-sm"
-  }, formatPrice(r.total)), expandedSettleDate === r.date ? /*#__PURE__*/React.createElement(ChevronUp, {
-    size: 14
-  }) : /*#__PURE__*/React.createElement(ChevronDown, {
-    size: 14
-  })), expandedSettleDate === r.date && /*#__PURE__*/React.createElement("div", {
-    className: "px-3 pb-3 bg-slate-50"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-500 py-2"
-  }, "설치비 ", fmt0(r.install), " · 양중비 ", fmt0(r.lift), " · 내림비 ", fmt0(r.unload), " · 기타", " ", fmt0(r.etc)), r.items.map(d => /*#__PURE__*/React.createElement("div", {
+    className: "text-sm font-semibold text-slate-700"
+  }, recordsYear, "\uB144 ", recordsMonth, "\uC6D4 \uC815\uC0B0"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm text-slate-600"
+  }, monthlyRecords.reduce((sum, r) => sum + r.count, 0), "\uAC74 \xB7 ", /*#__PURE__*/React.createElement("b", {
+    className: "font-mono text-indigo-700"
+  }, formatPrice(monthlyRecords.reduce((sum, r) => sum + r.total, 0)))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => exportRecordsPeriod("month"),
+    disabled: !recordsMonthRows.length,
+    "aria-label": "\uC6D4\uBCC4 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC",
+    title: "\uC6D4\uBCC4 \uC804\uCCB4 \uBC30\uC1A1 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC (\uC644\uB8CC\xB7\uC5F0\uAE30\xB7\uCDE8\uC18C \uD3EC\uD568)",
+    className: "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-40"
+  }, /*#__PURE__*/React.createElement(ExcelFileIcon, {
+    size: 17
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-7 gap-1 text-center"
+  }, ["일", "월", "화", "수", "목", "금", "토"].map(day => /*#__PURE__*/React.createElement("div", {
+    key: day,
+    className: "py-2 text-xs font-semibold text-slate-500"
+  }, day)), calendarCells.map((date, index) => {
+    if (!date) return /*#__PURE__*/React.createElement("div", {
+      key: "blank-" + index,
+      className: "min-h-20 sm:min-h-24 rounded-xl bg-slate-50/70"
+    });
+    const record = recordsByDate.get(date);
+    const selected = date === recordsDate;
+    return /*#__PURE__*/React.createElement("button", {
+      key: date,
+      onClick: () => {
+        setRecordsDate(date);
+        setDeliveryDate(date);
+      },
+      "aria-pressed": selected,
+      className: "min-h-20 sm:min-h-24 rounded-xl border p-1.5 sm:p-2 text-left transition " + (selected ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100" : record ? "border-indigo-100 bg-white hover:bg-indigo-50" : "border-slate-100 bg-white hover:bg-slate-50")
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "text-xs sm:text-sm font-semibold " + (selected ? "text-indigo-700" : "text-slate-700")
+    }, Number(date.slice(8, 10))), record ? /*#__PURE__*/React.createElement("span", {
+      className: "mt-1 block"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "block text-[10px] sm:text-xs text-slate-500"
+    }, record.count, "\uAC74"), /*#__PURE__*/React.createElement("span", {
+      className: "block truncate font-mono text-[10px] sm:text-xs font-semibold text-emerald-700"
+    }, formatPrice(record.total))) : /*#__PURE__*/React.createElement("span", {
+      className: "mt-1 hidden text-[10px] text-slate-300 sm:block"
+    }, "\uB0B4\uC5ED \uC5C6\uC74C"));
+  }))), recordsMode === "year" && /*#__PURE__*/React.createElement("div", {
+    className: "mt-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mb-3 flex items-center justify-between rounded-xl bg-indigo-50 px-4 py-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm font-semibold text-slate-700"
+  }, recordsYear, "\uB144 \uC804\uCCB4"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-sm text-slate-600"
+  }, yearlyRecords.reduce((sum, r) => sum + r.count, 0), "\uAC74 \xB7 ", /*#__PURE__*/React.createElement("b", {
+    className: "font-mono text-indigo-700"
+  }, formatPrice(yearlyRecords.reduce((sum, r) => sum + r.total, 0)))), /*#__PURE__*/React.createElement("button", {
+    onClick: () => exportRecordsPeriod("year"),
+    disabled: !recordsYearRows.length,
+    "aria-label": "\uC5F0\uBCC4 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC",
+    title: "\uC5F0\uBCC4 \uC804\uCCB4 \uBC30\uC1A1 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC (\uC644\uB8CC\xB7\uC5F0\uAE30\xB7\uCDE8\uC18C \uD3EC\uD568)",
+    className: "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-40"
+  }, /*#__PURE__*/React.createElement(ExcelFileIcon, {
+    size: 17
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4"
+  }, annualMonths.map(month => /*#__PURE__*/React.createElement("button", {
+    key: month.prefix,
+    onClick: () => {
+      const d = month.prefix + "-01";
+      setRecordsDate(d);
+      setDeliveryDate(d);
+      setRecordsMode("month");
+    },
+    className: "rounded-xl border p-3 text-left transition " + (month.days ? "border-indigo-100 bg-white hover:border-indigo-300 hover:bg-indigo-50" : "border-slate-100 bg-slate-50 text-slate-400")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "block font-semibold"
+  }, month.month, "\uC6D4"), /*#__PURE__*/React.createElement("span", {
+    className: "mt-1 block text-xs text-slate-500"
+  }, month.count, "\uAC74 \xB7 ", month.days, "\uC77C"), /*#__PURE__*/React.createElement("span", {
+    className: "mt-1 block truncate font-mono text-sm font-semibold text-emerald-700"
+  }, formatPrice(month.total)))))), recordsMode === "day" && /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("strong", {
+    className: "text-sm text-slate-800"
+  }, shortDate(recordsDate), " \uBC30\uC1A1 \uB0B4\uC5ED"), /*#__PURE__*/React.createElement("span", {
+    className: "text-sm text-slate-500"
+  }, recordsDayRows.length ? recordsDayRows.length + "건 · " + formatPrice(recordsDayRows.reduce((sum, d) => sum + deliveryTotal(d), 0)) : "배송 내역 없음"))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 rounded-xl border border-slate-200 bg-white"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3"
+  }, /*#__PURE__*/React.createElement("strong", {
+    className: "text-sm text-slate-800"
+  }, shortDate(recordsDate), " \uC0C1\uC138 \uB0B4\uC5ED"), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-slate-500"
+  }, recordsDayRows.length, "\uAC74"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => exportRecordsPeriod("day"),
+    disabled: !recordsDayRows.length,
+    "aria-label": "\uC77C\uBCC4 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC",
+    title: "\uC77C\uBCC4 \uC804\uCCB4 \uBC30\uC1A1 \uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC (\uC644\uB8CC\xB7\uC5F0\uAE30\xB7\uCDE8\uC18C \uD3EC\uD568)",
+    className: "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 disabled:opacity-40"
+  }, /*#__PURE__*/React.createElement(ExcelFileIcon, {
+    size: 17
+  })))), !recordsDayRows.length ? /*#__PURE__*/React.createElement("p", {
+    className: "px-4 py-6 text-center text-sm text-slate-400"
+  }, "\uC120\uD0DD\uD55C \uB0A0\uC9DC\uC5D0 \uBC30\uC1A1 \uB0B4\uC5ED\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
+    className: "divide-y divide-slate-100"
+  }, recordsDayRows.map(d => /*#__PURE__*/React.createElement("div", {
     key: d.id,
-    className: "flex flex-wrap items-center gap-2 py-1.5 text-sm border-t border-slate-200"
+    className: "flex flex-wrap items-center gap-2 px-4 py-3"
   }, /*#__PURE__*/React.createElement("span", {
-    className: `text-xs font-semibold px-1.5 py-0.5 rounded-sm ${STATUS_STYLE[d.status] || ""}`
+    className: "rounded-full px-2 py-1 text-xs font-semibold " + (STATUS_STYLE[d.status] || "bg-slate-100 text-slate-700")
   }, d.status), /*#__PURE__*/React.createElement("span", {
-    className: "flex-1 basis-48 min-w-0"
+    className: "min-w-0 flex-1 basis-48"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "block truncate"
-  }, productLabel(d)), d.address && /*#__PURE__*/React.createElement("span", {
-    className: "block text-xs text-slate-500 truncate"
-  }, d.address)), /*#__PURE__*/React.createElement("span", {
-    className: "text-xs text-slate-500 whitespace-nowrap"
-  }, "설치 ", fmt0(d.install), " · 양중 ", fmt0(d.lift), " · 내림 ", fmt0(d.unload), " · 기타 ", fmt0(d.etc)), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-emerald-700 font-semibold w-24 text-right"
-  }, formatPrice(deliveryTotal(d)))))))))))));
+    className: "block truncate text-sm font-medium text-slate-800"
+  }, productLabel(d) || "상품 미입력"), /*#__PURE__*/React.createElement("span", {
+    className: "block truncate text-xs text-slate-500"
+  }, d.address || "주소 미입력")), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-slate-500"
+  }, "\uC124\uCE58 ", fmt0(d.install), " \xB7 \uC591\uC911 ", fmt0(d.lift), " \xB7 \uB0B4\uB9BC ", fmt0(d.unload), " \xB7 \uAE30\uD0C0 ", fmt0(d.etc)), /*#__PURE__*/React.createElement("span", {
+    className: "w-24 text-right font-mono text-sm font-semibold text-emerald-700"
+  }, formatPrice(deliveryTotal(d))))))))));
   return /*#__PURE__*/React.createElement("div", {
     className: "min-h-screen bg-slate-50 text-slate-900"
   }, /*#__PURE__*/React.createElement("style", null, PRINT_CSS), /*#__PURE__*/React.createElement("div", {
-    className: "no-print bg-slate-900 text-white px-5 py-6 sm:px-8 sm:py-8"
+    className: "no-print sticky top-0 z-20 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-800 text-white px-5 py-5 sm:px-8 sm:py-7 shadow-lg"
   }, /*#__PURE__*/React.createElement("div", {
     className: `${view === "lookup" ? "max-w-3xl" : "max-w-5xl"} mx-auto`
   }, /*#__PURE__*/React.createElement("p", {
-    className: "text-amber-400 text-xs font-semibold tracking-widest mb-1"
+    className: "text-xs font-semibold tracking-widest mb-1 " + (view === "lookup" ? "text-indigo-300" : view === "delivery" ? "text-emerald-300" : "text-amber-300")
   }, headTexts[view][0]), /*#__PURE__*/React.createElement("h1", {
     className: "text-xl sm:text-2xl font-bold"
   }, headTexts[view][1]), /*#__PURE__*/React.createElement("p", {
     className: "text-slate-400 text-sm mt-1"
   }, headTexts[view][2]), /*#__PURE__*/React.createElement("div", {
-    className: "mt-4 flex gap-2"
+    className: "mt-5 inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/10 bg-slate-950/40 p-1.5",
+    role: "tablist",
+    "aria-label": "\uD398\uC774\uC9C0 \uBA54\uB274"
   }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    role: "tab",
+    "aria-selected": view === "lookup",
     onClick: () => setView("lookup"),
-    className: `px-4 py-2 text-sm font-semibold ${view === "lookup" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`
-  }, "단가 조회"), /*#__PURE__*/React.createElement("button", {
+    className: "inline-flex min-w-32 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition " + (view === "lookup" ? "border-indigo-400 bg-indigo-500 text-white shadow-lg shadow-indigo-950/20" : "border-indigo-300/25 bg-indigo-500/10 text-indigo-100 hover:bg-indigo-500/20")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "grid h-6 w-6 place-items-center rounded-full bg-black/10 text-[11px]"
+  }, "01"), /*#__PURE__*/React.createElement("span", null, "\uB2E8\uAC00 \uC870\uD68C")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    role: "tab",
+    "aria-selected": view === "delivery",
     onClick: () => setView("delivery"),
-    className: `px-4 py-2 text-sm font-semibold ${view === "delivery" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`
-  }, "배송 리스트"), /*#__PURE__*/React.createElement("button", {
+    className: "inline-flex min-w-32 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition " + (view === "delivery" ? "border-emerald-400 bg-emerald-500 text-white shadow-lg shadow-emerald-950/20" : "border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "grid h-6 w-6 place-items-center rounded-full bg-black/10 text-[11px]"
+  }, "02"), /*#__PURE__*/React.createElement("span", null, "\uBC30\uC1A1 \uB9AC\uC2A4\uD2B8")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    role: "tab",
+    "aria-selected": view === "settle",
     onClick: () => setView("settle"),
-    className: `px-4 py-2 text-sm font-semibold ${view === "settle" ? "bg-amber-500 text-slate-900" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`
-  }, "정산 페이지")))), /*#__PURE__*/React.createElement("div", {
+    className: "inline-flex min-w-32 items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition " + (view === "settle" ? "border-amber-300 bg-amber-400 text-slate-950 shadow-lg shadow-amber-950/20" : "border-amber-200/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/20")
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "grid h-6 w-6 place-items-center rounded-full bg-black/10 text-[11px]"
+  }, "03"), /*#__PURE__*/React.createElement("span", null, "\uC815\uC0B0 \uD398\uC774\uC9C0"))))), /*#__PURE__*/React.createElement("div", {
     className: `no-print ${view === "lookup" ? "max-w-3xl" : "max-w-5xl"} mx-auto px-5 sm:px-8 py-6`
   }, view === "delivery" ? deliveryView : view === "settle" ? settleView : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "relative"
@@ -15490,11 +15798,11 @@ function DangaLookup() {
     type: "text",
     value: query,
     onChange: e => setQuery(e.target.value),
-    placeholder: "예: 이즈 카이  또는  동서가구 이즈 카이 1단 3서랍 LED 수납침대...",
+    placeholder: "\uC608: \uC774\uC988 \uCE74\uC774  \uB610\uB294  \uB3D9\uC11C\uAC00\uAD6C \uC774\uC988 \uCE74\uC774 1\uB2E8 3\uC11C\uB78D LED \uC218\uB0A9\uCE68\uB300...",
     className: "w-full bg-white border-2 border-slate-900 rounded-none pl-12 pr-4 py-3 text-base focus:outline-none focus:border-amber-500"
   })), /*#__PURE__*/React.createElement("div", {
     className: "mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500"
-  }, /*#__PURE__*/React.createElement("span", null, "수수료율"), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("span", null, "\uC218\uC218\uB8CC\uC728"), /*#__PURE__*/React.createElement("input", {
     type: "number",
     inputMode: "decimal",
     min: "0",
@@ -15503,17 +15811,17 @@ function DangaLookup() {
     value: feeRate,
     onChange: e => changeFeeRate(e.target.value),
     className: "w-16 border border-slate-300 px-2 py-1 text-base font-mono text-slate-900 focus:outline-none focus:border-slate-900"
-  }), /*#__PURE__*/React.createElement("span", null, "% · 수수료 제외 단가 = 원단가 × ", Number((100 - feeRate).toFixed(2)), "% (원 단위 반올림)")), /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("span", null, "% \xB7 \uC218\uC218\uB8CC \uC81C\uC678 \uB2E8\uAC00 = \uC6D0\uB2E8\uAC00 \xD7 ", Number((100 - feeRate).toFixed(2)), "% (\uC6D0 \uB2E8\uC704 \uBC18\uC62C\uB9BC)")), /*#__PURE__*/React.createElement("div", {
     className: "mt-4"
   }, !loaded ? /*#__PURE__*/React.createElement("p", {
     className: "text-slate-400 text-sm py-6"
-  }, "불러오는 중...") : !query.trim() ? /*#__PURE__*/React.createElement("p", {
+  }, "\uBD88\uB7EC\uC624\uB294 \uC911...") : !query.trim() ? /*#__PURE__*/React.createElement("p", {
     className: "text-slate-400 text-sm py-6"
-  }, "검색어를 입력해주세요. 등록된 상품 ", products.length, "건 중에서 찾아드려요.") : results.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, "\uAC80\uC0C9\uC5B4\uB97C \uC785\uB825\uD574\uC8FC\uC138\uC694. \uB4F1\uB85D\uB41C \uC0C1\uD488 ", products.length, "\uAC74 \uC911\uC5D0\uC11C \uCC3E\uC544\uB4DC\uB824\uC694.") : results.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-slate-500 text-sm py-6"
-  }, "일치하는 상품이 없어요. 상품명을 다시 확인하거나 아래 상품 관리에서 등록해주세요.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+  }, "\uC77C\uCE58\uD558\uB294 \uC0C1\uD488\uC774 \uC5C6\uC5B4\uC694. \uC0C1\uD488\uBA85\uC744 \uB2E4\uC2DC \uD655\uC778\uD558\uAC70\uB098 \uC544\uB798 \uC0C1\uD488 \uAD00\uB9AC\uC5D0\uC11C \uB4F1\uB85D\uD574\uC8FC\uC138\uC694.") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mb-2"
-  }, "상품 ", groupedResults.length, "건 · 단가 ", results.length, "건 검색됨"), /*#__PURE__*/React.createElement("div", {
+  }, "\uC0C1\uD488 ", groupedResults.length, "\uAC74 \xB7 \uB2E8\uAC00 ", results.length, "\uAC74 \uAC80\uC0C9\uB428"), /*#__PURE__*/React.createElement("div", {
     className: "border border-slate-200 divide-y divide-slate-200 bg-white"
   }, groupedResults.map(g => /*#__PURE__*/React.createElement("div", {
     key: g.name,
@@ -15544,28 +15852,28 @@ function DangaLookup() {
       className: "flex items-baseline justify-between gap-2 whitespace-nowrap"
     }, /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, "원단가"), /*#__PURE__*/React.createElement("span", {
+    }, "\uC6D0\uB2E8\uAC00"), /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-emerald-700 font-semibold text-sm"
     }, formatPrice(cur.price))), /*#__PURE__*/React.createElement("span", {
       className: "flex items-baseline justify-between gap-2 whitespace-nowrap"
     }, /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, "수수료 제외"), /*#__PURE__*/React.createElement("span", {
+    }, "\uC218\uC218\uB8CC \uC81C\uC678"), /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-blue-700 font-semibold text-sm"
     }, formatPrice(netOf(cur.price, feeRate))))), cur && hasNum(cur.applied) && /*#__PURE__*/React.createElement("span", {
       className: "flex items-baseline justify-between gap-2 whitespace-nowrap"
     }, /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, "적용단가"), /*#__PURE__*/React.createElement("span", {
+    }, "\uC801\uC6A9\uB2E8\uAC00"), /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-purple-700 font-semibold text-sm"
     }, formatPrice(cur.applied))), cur && !(hasNum(cur.price) && cur.price > 0) && !hasNum(cur.applied) && /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400"
-    }, "단가 없음")), cur && cur.effectiveDate && /*#__PURE__*/React.createElement("span", {
+    }, "\uB2E8\uAC00 \uC5C6\uC74C")), cur && cur.effectiveDate && /*#__PURE__*/React.createElement("span", {
       className: "text-xs text-slate-400 whitespace-nowrap"
     }, cur.effectiveDate, "~")), rg.history.length > 0 && /*#__PURE__*/React.createElement("button", {
       onClick: () => toggleHistory(histKey),
       className: "text-xs text-slate-400 underline hover:text-slate-600"
-    }, "이전 단가 ", rg.history.length, "건 ", isHistOpen ? "숨기기" : "보기")), isHistOpen && /*#__PURE__*/React.createElement("div", {
+    }, "\uC774\uC804 \uB2E8\uAC00 ", rg.history.length, "\uAC74 ", isHistOpen ? "숨기기" : "보기")), isHistOpen && /*#__PURE__*/React.createElement("div", {
       className: "ml-1 pl-3 border-l-2 border-slate-200 flex flex-col gap-1"
     }, rg.history.map(h => /*#__PURE__*/React.createElement("div", {
       key: h.id,
@@ -15574,17 +15882,17 @@ function DangaLookup() {
       className: "whitespace-nowrap"
     }, h.effectiveDate || "날짜 없음"), hasNum(h.price) && h.price > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
       className: "font-mono"
-    }, "원 ", formatPrice(h.price)), /*#__PURE__*/React.createElement("span", {
+    }, "\uC6D0 ", formatPrice(h.price)), /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-blue-700"
-    }, "제외 ", formatPrice(netOf(h.price, feeRate)))), hasNum(h.applied) && /*#__PURE__*/React.createElement("span", {
+    }, "\uC81C\uC678 ", formatPrice(netOf(h.price, feeRate)))), hasNum(h.applied) && /*#__PURE__*/React.createElement("span", {
       className: "font-mono text-purple-700"
-    }, "적용 ", formatPrice(h.applied))))));
+    }, "\uC801\uC6A9 ", formatPrice(h.applied))))));
   }))))))), /*#__PURE__*/React.createElement("div", {
     className: "mt-8 border-t border-slate-200 pt-4"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setManageOpen(v => !v),
     className: "flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-slate-900"
-  }, "상품 관리 (", products.length, "건)", manageOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
+  }, "\uC0C1\uD488 \uAD00\uB9AC (", products.length, "\uAC74)", manageOpen ? /*#__PURE__*/React.createElement(ChevronUp, {
     size: 16
   }) : /*#__PURE__*/React.createElement(ChevronDown, {
     size: 16
@@ -15594,13 +15902,13 @@ function DangaLookup() {
     className: "bg-white border border-slate-200 p-4"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-semibold mb-2"
-  }, "엑셀/CSV로 한번에 등록"), /*#__PURE__*/React.createElement("p", {
+  }, "\uC5D1\uC140/CSV\uB85C \uD55C\uBC88\uC5D0 \uB4F1\uB85D"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mb-3"
-  }, "'상품명/품명', '원단가(또는 단가)', '적용단가' 열은 자동 인식해요. '구분/사유', '적용일' 열이 있으면 재출고·프로모션·월별 단가변경도 같이 불러와요. 없으면 전부 '기본'·오늘 날짜로 등록돼요."), /*#__PURE__*/React.createElement("label", {
+  }, "'\uC0C1\uD488\uBA85/\uD488\uBA85', '\uC6D0\uB2E8\uAC00(\uB610\uB294 \uB2E8\uAC00)', '\uC801\uC6A9\uB2E8\uAC00' \uC5F4\uC740 \uC790\uB3D9 \uC778\uC2DD\uD574\uC694. '\uAD6C\uBD84/\uC0AC\uC720', '\uC801\uC6A9\uC77C' \uC5F4\uC774 \uC788\uC73C\uBA74 \uC7AC\uCD9C\uACE0\xB7\uD504\uB85C\uBAA8\uC158\xB7\uC6D4\uBCC4 \uB2E8\uAC00\uBCC0\uACBD\uB3C4 \uAC19\uC774 \uBD88\uB7EC\uC640\uC694. \uC5C6\uC73C\uBA74 \uC804\uBD80 '\uAE30\uBCF8'\xB7\uC624\uB298 \uB0A0\uC9DC\uB85C \uB4F1\uB85D\uB3FC\uC694."), /*#__PURE__*/React.createElement("label", {
     className: "inline-flex items-center gap-2 cursor-pointer bg-slate-900 text-white text-sm px-4 py-2 hover:bg-slate-800"
   }, /*#__PURE__*/React.createElement(Upload, {
     size: 16
-  }), "파일 선택", /*#__PURE__*/React.createElement("input", {
+  }), "\uD30C\uC77C \uC120\uD0DD", /*#__PURE__*/React.createElement("input", {
     ref: fileInputRef,
     type: "file",
     accept: ".csv,.xlsx,.xls",
@@ -15612,35 +15920,35 @@ function DangaLookup() {
     className: "bg-white border border-slate-200 p-4"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-semibold mb-1"
-  }, "상품 직접 추가"), /*#__PURE__*/React.createElement("p", {
+  }, "\uC0C1\uD488 \uC9C1\uC811 \uCD94\uAC00"), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-500 mb-3"
-  }, "같은 상품·같은 구분이라도 적용일을 다르게 넣으면 단가 변경 이력으로 따로 쌓여요. 검색에는 오늘 기준 최신 단가만 크게 보여요."), /*#__PURE__*/React.createElement("div", {
+  }, "\uAC19\uC740 \uC0C1\uD488\xB7\uAC19\uC740 \uAD6C\uBD84\uC774\uB77C\uB3C4 \uC801\uC6A9\uC77C\uC744 \uB2E4\uB974\uAC8C \uB123\uC73C\uBA74 \uB2E8\uAC00 \uBCC0\uACBD \uC774\uB825\uC73C\uB85C \uB530\uB85C \uC313\uC5EC\uC694. \uAC80\uC0C9\uC5D0\uB294 \uC624\uB298 \uAE30\uC900 \uCD5C\uC2E0 \uB2E8\uAC00\uB9CC \uD06C\uAC8C \uBCF4\uC5EC\uC694."), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col sm:flex-row gap-2"
   }, /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: newName,
     onChange: e => setNewName(e.target.value),
-    placeholder: "상품명 (전체 옵션명 그대로)",
+    placeholder: "\uC0C1\uD488\uBA85 (\uC804\uCCB4 \uC635\uC158\uBA85 \uADF8\uB300\uB85C)",
     className: "flex-1 border border-slate-300 px-3 py-2 text-base focus:outline-none focus:border-slate-900"
   }), /*#__PURE__*/React.createElement("input", {
     type: "text",
     inputMode: "numeric",
     value: newPrice,
     onChange: e => setNewPrice(e.target.value),
-    placeholder: "원단가 (모르면 비워둠)",
+    placeholder: "\uC6D0\uB2E8\uAC00 (\uBAA8\uB974\uBA74 \uBE44\uC6CC\uB460)",
     className: "sm:w-36 border border-slate-300 px-3 py-2 text-base font-mono focus:outline-none focus:border-slate-900"
   }), /*#__PURE__*/React.createElement("input", {
     type: "text",
     inputMode: "numeric",
     value: newApplied,
     onChange: e => setNewApplied(e.target.value),
-    placeholder: "적용단가",
+    placeholder: "\uC801\uC6A9\uB2E8\uAC00",
     className: "sm:w-28 border border-slate-300 px-3 py-2 text-base font-mono focus:outline-none focus:border-slate-900"
   }), /*#__PURE__*/React.createElement("input", {
     type: "date",
     value: newEffectiveDate,
     onChange: e => setNewEffectiveDate(e.target.value),
-    title: "적용일 (이 날짜부터 이 단가가 적용돼요)",
+    title: "\uC801\uC6A9\uC77C (\uC774 \uB0A0\uC9DC\uBD80\uD130 \uC774 \uB2E8\uAC00\uAC00 \uC801\uC6A9\uB3FC\uC694)",
     className: "sm:w-36 border border-slate-300 px-2 py-2 text-base focus:outline-none focus:border-slate-900"
   }), !addingCustomReason ? /*#__PURE__*/React.createElement("select", {
     value: newReason,
@@ -15658,13 +15966,13 @@ function DangaLookup() {
     value: r
   }, r)), /*#__PURE__*/React.createElement("option", {
     value: "__custom__"
-  }, "+ 새 구분 추가")) : /*#__PURE__*/React.createElement("div", {
+  }, "+ \uC0C8 \uAD6C\uBD84 \uCD94\uAC00")) : /*#__PURE__*/React.createElement("div", {
     className: "flex gap-1 sm:w-40"
   }, /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: customReasonInput,
     onChange: e => setCustomReasonInput(e.target.value),
-    placeholder: "새 구분명",
+    placeholder: "\uC0C8 \uAD6C\uBD84\uBA85",
     className: "flex-1 border border-slate-300 px-2 py-2 text-base focus:outline-none focus:border-slate-900"
   }), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
@@ -15672,7 +15980,7 @@ function DangaLookup() {
       setNewReason("기본");
     },
     className: "px-2 text-slate-400 hover:text-slate-700",
-    title: "취소"
+    title: "\uCDE8\uC18C"
   }, /*#__PURE__*/React.createElement(X, {
     size: 16
   }))), /*#__PURE__*/React.createElement("button", {
@@ -15680,26 +15988,26 @@ function DangaLookup() {
     className: "flex items-center justify-center gap-1 bg-amber-500 text-slate-900 font-semibold text-sm px-4 py-2 hover:bg-amber-400"
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 16
-  }), "추가"))), /*#__PURE__*/React.createElement("div", {
+  }), "\uCD94\uAC00"))), /*#__PURE__*/React.createElement("div", {
     className: "bg-white border border-slate-200"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between px-4 py-3 border-b border-slate-200"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-sm font-semibold"
-  }, "등록된 상품 목록"), products.length > 0 && (!confirmResetAll ? /*#__PURE__*/React.createElement("button", {
+  }, "\uB4F1\uB85D\uB41C \uC0C1\uD488 \uBAA9\uB85D"), products.length > 0 && (!confirmResetAll ? /*#__PURE__*/React.createElement("button", {
     onClick: () => setConfirmResetAll(true),
     className: "text-xs text-red-600 hover:underline"
-  }, "전체 삭제") : /*#__PURE__*/React.createElement("span", {
+  }, "\uC804\uCCB4 \uC0AD\uC81C") : /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-2 text-xs"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-slate-500"
-  }, "정말요?"), /*#__PURE__*/React.createElement("button", {
+  }, "\uC815\uB9D0\uC694?"), /*#__PURE__*/React.createElement("button", {
     onClick: handleResetAll,
     className: "text-red-600 font-semibold hover:underline"
-  }, "삭제"), /*#__PURE__*/React.createElement("button", {
+  }, "\uC0AD\uC81C"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setConfirmResetAll(false),
     className: "text-slate-400 hover:underline"
-  }, "취소")))), products.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, "\uCDE8\uC18C")))), products.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "px-4 py-2 border-b border-slate-200 relative"
   }, /*#__PURE__*/React.createElement(Search, {
     size: 14,
@@ -15708,17 +16016,17 @@ function DangaLookup() {
     type: "text",
     value: manageQuery,
     onChange: e => setManageQuery(e.target.value),
-    placeholder: "목록에서 상품 찾기 (수정할 상품 검색)",
+    placeholder: "\uBAA9\uB85D\uC5D0\uC11C \uC0C1\uD488 \uCC3E\uAE30 (\uC218\uC815\uD560 \uC0C1\uD488 \uAC80\uC0C9)",
     className: "w-full border border-slate-300 pl-7 pr-2 py-1.5 text-base focus:outline-none focus:border-slate-900"
   }), manageQuery.trim() && /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-slate-400 mt-1"
-  }, filteredManageProducts.length, "건 일치")), saveError && /*#__PURE__*/React.createElement("p", {
+  }, filteredManageProducts.length, "\uAC74 \uC77C\uCE58")), saveError && /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-red-600 px-4 py-2"
-  }, "저장 중 문제가 생겼어요. 새로고침 후 다시 시도해주세요."), products.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, "\uC800\uC7A5 \uC911 \uBB38\uC81C\uAC00 \uC0DD\uACBC\uC5B4\uC694. \uC0C8\uB85C\uACE0\uCE68 \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694."), products.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-400 px-4 py-6"
-  }, "등록된 상품이 없어요.") : filteredManageProducts.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, "\uB4F1\uB85D\uB41C \uC0C1\uD488\uC774 \uC5C6\uC5B4\uC694.") : filteredManageProducts.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-slate-400 px-4 py-6"
-  }, "검색어와 일치하는 상품이 없어요.") : /*#__PURE__*/React.createElement("div", {
+  }, "\uAC80\uC0C9\uC5B4\uC640 \uC77C\uCE58\uD558\uB294 \uC0C1\uD488\uC774 \uC5C6\uC5B4\uC694.") : /*#__PURE__*/React.createElement("div", {
     className: "divide-y divide-slate-100 max-h-96 overflow-y-auto"
   }, filteredManageProducts.map(p => /*#__PURE__*/React.createElement("div", {
     key: p.id,
@@ -15739,7 +16047,7 @@ function DangaLookup() {
       ...d,
       price: e.target.value
     })),
-    placeholder: "원단가",
+    placeholder: "\uC6D0\uB2E8\uAC00",
     className: "w-24 border border-slate-300 px-2 py-1.5 text-base font-mono focus:outline-none focus:border-slate-900"
   }), /*#__PURE__*/React.createElement("input", {
     type: "text",
@@ -15749,7 +16057,7 @@ function DangaLookup() {
       ...d,
       applied: e.target.value
     })),
-    placeholder: "적용단가",
+    placeholder: "\uC801\uC6A9\uB2E8\uAC00",
     className: "w-24 border border-slate-300 px-2 py-1.5 text-base font-mono focus:outline-none focus:border-slate-900"
   }), /*#__PURE__*/React.createElement("input", {
     type: "date",
@@ -15770,13 +16078,13 @@ function DangaLookup() {
   }), /*#__PURE__*/React.createElement("button", {
     onClick: () => saveEdit(p.id),
     className: "p-2 text-emerald-700 hover:bg-emerald-50",
-    title: "저장"
+    title: "\uC800\uC7A5"
   }, /*#__PURE__*/React.createElement(Check, {
     size: 16
   })), /*#__PURE__*/React.createElement("button", {
     onClick: cancelEdit,
     className: "p-2 text-slate-400 hover:bg-slate-100",
-    title: "취소"
+    title: "\uCDE8\uC18C"
   }, /*#__PURE__*/React.createElement(X, {
     size: 16
   }))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -15789,16 +16097,16 @@ function DangaLookup() {
     className: "font-mono text-emerald-700 text-sm whitespace-nowrap"
   }, hasNum(p.price) && p.price > 0 ? `원 ${formatPrice(p.price)}` : "원단가 -"), hasNum(p.applied) && /*#__PURE__*/React.createElement("div", {
     className: "font-mono text-purple-700 text-sm whitespace-nowrap"
-  }, "적용 ", formatPrice(p.applied)), /*#__PURE__*/React.createElement("button", {
+  }, "\uC801\uC6A9 ", formatPrice(p.applied)), /*#__PURE__*/React.createElement("button", {
     onClick: () => startEdit(p),
     className: "p-2 text-slate-500 hover:bg-slate-100",
-    title: "수정"
+    title: "\uC218\uC815"
   }, /*#__PURE__*/React.createElement(Pencil, {
     size: 14
   })), confirmDeleteProductId !== p.id ? /*#__PURE__*/React.createElement("button", {
     onClick: () => setConfirmDeleteProductId(p.id),
     className: "p-2 text-slate-500 hover:bg-red-50 hover:text-red-600",
-    title: "삭제"
+    title: "\uC0AD\uC81C"
   }, /*#__PURE__*/React.createElement(Trash2, {
     size: 14
   })) : /*#__PURE__*/React.createElement("span", {
@@ -15806,18 +16114,15 @@ function DangaLookup() {
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => handleDelete(p.id),
     className: "text-red-600 font-semibold hover:underline px-1"
-  }, "삭제"), /*#__PURE__*/React.createElement("button", {
+  }, "\uC0AD\uC81C"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setConfirmDeleteProductId(null),
     className: "text-slate-400 hover:underline px-1"
-  }, "취소"))))))), /*#__PURE__*/React.createElement("datalist", {
+  }, "\uCDE8\uC18C"))))))), /*#__PURE__*/React.createElement("datalist", {
     id: "reason-options"
   }, allReasons.map(r => /*#__PURE__*/React.createElement("option", {
     key: r,
     value: r
   }))))))), view === "delivery" && printView, view === "settle" && settlePrintView);
 }
-ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(DangaLookup, null));
-})();
-</script>
-</body>
-</html>
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(DangaLookup));
+</script></body></html>
